@@ -1,0 +1,134 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "recipe.schema.json",
+  "title": "DGX Spark Inference Recipe Manifest",
+  "description": "Manifest v1 for recipes/<runtime>/<slug>/recipe.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema",
+    "schema_version",
+    "id",
+    "title",
+    "summary",
+    "runtime",
+    "model",
+    "hardware",
+    "entrypoint",
+    "status",
+    "tested_at"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "const": "../../../schema/recipe.schema.json"
+    },
+    "schema_version": {
+      "type": "integer",
+      "const": 1
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^(sglang|llama-cpp|vllm)/[a-z0-9]+(-[a-z0-9]+)*$"
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "\\S"
+    },
+    "summary": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "\\S"
+    },
+    "runtime": {
+      "type": "string",
+      "enum": ["sglang", "llama-cpp", "vllm"]
+    },
+    "model": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["repository", "revision"],
+      "properties": {
+        "repository": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^[^\\s]+$"
+        },
+        "revision": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^[^\\s]+$"
+        }
+      }
+    },
+    "hardware": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["target", "gpu"],
+      "properties": {
+        "target": {
+          "type": "string",
+          "const": "NVIDIA DGX Spark"
+        },
+        "gpu": {
+          "type": "string",
+          "const": "GB10"
+        }
+      }
+    },
+    "entrypoint": {
+      "type": "string",
+      "const": "run.sh"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["draft", "verified", "deprecated"]
+    },
+    "tested_at": {
+      "anyOf": [
+        { "type": "null" },
+        {
+          "type": "string",
+          "format": "date",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+        }
+      ]
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "status": { "const": "draft" }
+        },
+        "required": ["status"]
+      },
+      "then": {
+        "properties": {
+          "tested_at": { "type": "null" }
+        },
+        "required": ["tested_at"]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": { "const": "verified" }
+        },
+        "required": ["status"]
+      },
+      "then": {
+        "properties": {
+          "tested_at": {
+            "type": "string",
+            "format": "date",
+            "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+          }
+        },
+        "required": ["tested_at"]
+      }
+    }
+  ]
+}
+

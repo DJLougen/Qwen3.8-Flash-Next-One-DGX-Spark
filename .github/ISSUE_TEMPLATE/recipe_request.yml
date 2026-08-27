@@ -1,0 +1,71 @@
+name: Recipe request
+description: Request a new inference recipe for a model and runtime lane
+title: "[recipe]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this form to propose a recipe before implementation. A volunteer or maintainer can scaffold with `make new` and land a draft PR.
+
+  - type: dropdown
+    id: runtime
+    attributes:
+      label: Runtime lane
+      description: Supported IDs only
+      options:
+        - sglang
+        - llama-cpp
+        - vllm
+    validations:
+      required: true
+
+  - type: input
+    id: model
+    attributes:
+      label: Model repository
+      description: Hugging Face org/repo or documented artifact source
+      placeholder: org/model-name
+    validations:
+      required: true
+
+  - type: input
+    id: revision
+    attributes:
+      label: Model revision
+      description: Tag, commit, branch, or specific GGUF / artifact file
+      placeholder: main
+    validations:
+      required: true
+
+  - type: textarea
+    id: use_case
+    attributes:
+      label: Use case
+      description: Why is this recipe useful on DGX Spark? Target workload (chat, batch, embedding, etc.)
+    validations:
+      required: true
+
+  - type: textarea
+    id: constraints
+    attributes:
+      label: Constraints
+      description: Context length, precision, quantization, concurrency, or memory limits if known.
+      placeholder: |
+        - Max context:
+        - Precision / quant:
+        - Expected concurrency:
+
+  - type: textarea
+    id: references
+    attributes:
+      label: References
+      description: Upstream docs, prior benchmarks (with caveats), or related recipes in other repos.
+      placeholder: Links to upstream README, containers, or issues
+
+  - type: checkboxes
+    id: contribution
+    attributes:
+      label: Contribution
+      options:
+        - label: I am willing to contribute and test this recipe on DGX Spark GB10
+        - label: I only need someone else to implement this recipe

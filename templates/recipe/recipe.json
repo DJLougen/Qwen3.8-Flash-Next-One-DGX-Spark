@@ -1,0 +1,19 @@
+{
+  "$schema": "../../../schema/recipe.schema.json",
+  "schema_version": 1,
+  "id": "{{RECIPE_ID}}",
+  "title": "{{TITLE}}",
+  "summary": "{{SUMMARY}}",
+  "runtime": "{{RUNTIME}}",
+  "model": {
+    "repository": "{{MODEL_REPOSITORY}}",
+    "revision": "{{MODEL_REVISION}}"
+  },
+  "hardware": {
+    "target": "NVIDIA DGX Spark",
+    "gpu": "GB10"
+  },
+  "entrypoint": "run.sh",
+  "status": "draft",
+  "tested_at": null
+}

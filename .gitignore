@@ -1,0 +1,48 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.Python
+*.egg-info/
+.eggs/
+dist/
+build/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# OS and editor
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# Logs and local artifacts
+*.log
+logs/
+tmp/
+temp/
+.cache/
+
+# Model weights and converted artifacts
+*.safetensors
+*.gguf
+*.pt
+*.pth
+*.onnx
+
+# Recipe-local overrides (secrets)
+recipes/**/.env

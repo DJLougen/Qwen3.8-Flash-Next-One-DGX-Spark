@@ -1,0 +1,77 @@
+name: Bug report
+description: Report a bug in a recipe, validator, or generator
+title: "[bug]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a problem. Include enough detail for someone to reproduce on DGX Spark GB10 when applicable.
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Recipe (runtime invocation or manifest)
+        - Validator (`validate_recipes.py`)
+        - Generator (`new_recipe.py`)
+        - Documentation
+        - Other
+    validations:
+      required: true
+
+  - type: input
+    id: recipe_path
+    attributes:
+      label: Recipe path
+      description: Leave blank if not recipe-specific (e.g. `recipes/vllm/my-slug`)
+      placeholder: recipes/<runtime>/<slug>
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What should happen?
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: What happened instead? Include error messages and exit codes.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: Commands run, starting from a clean checkout when possible.
+      placeholder: |
+        1. git clone ...
+        2. make validate
+        3. cd recipes/...
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Host/OS and relevant runtime, model, or tooling versions. Include Spark details only for recipe-specific bugs; never include secrets.
+      placeholder: |
+        - Host / OS:
+        - DGX Spark image and driver (if applicable):
+        - Runtime or Python version:
+        - Model revision (if applicable):
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: secrets
+    attributes:
+      label: Secret hygiene
+      options:
+        - label: I have not pasted API keys, tokens, or passwords into this issue
+          required: true
