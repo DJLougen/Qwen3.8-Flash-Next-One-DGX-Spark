@@ -1,0 +1,1 @@
+Explain in exactly four concise sentences why deterministic inference benchmarking requires fixed prompts, fixed decoding parameters, and repeated measurements.

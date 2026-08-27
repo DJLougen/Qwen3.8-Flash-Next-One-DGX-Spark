@@ -1,0 +1,10 @@
+Return only a corrected implementation of this function. Preserve its signature and docstring. The current code fails when records share the same timestamp because later values overwrite earlier ones; all values must be retained in input order within each timestamp.
+
+```python
+def group_by_timestamp_@(records: list[tuple[int, str]]) -> dict[int, list[str]]:
+    """Group record values by integer timestamp."""
+    grouped: dict[int, str] = {}
+    for timestamp, value in records:
+        grouped[timestamp] = value
+    return {timestamp: [value] for timestamp, value in grouped.items()}
+```

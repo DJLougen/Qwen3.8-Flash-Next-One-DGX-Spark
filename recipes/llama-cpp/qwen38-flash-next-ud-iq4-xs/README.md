@@ -1,0 +1,167 @@
+# Qwen3.8 Flash Next UD-IQ4_XS on DGX Spark
+
+> **Local release-candidate draft. Do not publish yet.**
+>
+> This recipe is measured on one DGX Spark, but it remains `draft` because the
+> supporting llama.cpp architecture is an open PR and an experimental graph-reuse
+> patch caused a server crash. Only the unpatched configuration below is allowed.
+
+## Scope
+
+This lane targets the three-shard `UD-IQ4_XS` GGUF from
+[`unsloth/Qwen3.8-Flash-Next-GGUF`](https://huggingface.co/unsloth/Qwen3.8-Flash-Next-GGUF)
+at immutable revision `ff34bcdd8a6ecffbe75b392e57b866df8f6bba8f`.
+
+The model's “51B n-gram” feature is its 20-million-row PLE embedding table
+(`per_layer_token_embd.weight`). It is unrelated to llama.cpp's optional
+`--spec-type ngram-mod` speculative decoder.
+
+This recipe keeps the PLE table on CPU-backed mmap storage with lazy row reads:
+
+```text
+-lm mmap
+--tensor-read-lazy on
+-ot per_layer_token_embd=CPU
+```
+
+That still uses every requested PLE row while avoiding roughly 27 GiB of
+always-resident table memory.
+
+## Pinned runtime
+
+- llama.cpp PR: [`ggml-org/llama.cpp#27742`](https://github.com/ggml-org/llama.cpp/pull/27742)
+- Tested commit: `250b61446efc91e3a179c8677956f2667c8fbda0`
+- Build: Release, `GGML_CUDA=ON`, CUDA architecture `121a-real`
+- CUDA toolkit: 13.0.2
+- NVIDIA driver: 580.159.03
+- Device: NVIDIA GB10
+
+Do not use the older `/home/djl/llama.cpp` build; it does not support
+`qwen4exp`. The tested Spark tree is `/home/djl/llama.cpp-qwen4exp`.
+
+## Artifact verification
+
+Expected files under
+`/home/djl/models/Qwen3.8-Flash-Next-UD-IQ4_XS/UD-IQ4_XS/`:
+
+| Shard | Bytes | SHA-256 |
+|---|---:|---|
+| `Qwen3.8-Flash-Next-UD-IQ4_XS-00001-of-00003.gguf` | 10,946,624 | `5ce89370720f8bf90890f439361282104c1aa1482d4013bb9a50923e758e71a4` |
+| `Qwen3.8-Flash-Next-UD-IQ4_XS-00002-of-00003.gguf` | 49,835,229,856 | `577a38a2392b40ca2193cea502e1d92f60b8cd370675d308e0ec21885d9daaa7` |
+| `Qwen3.8-Flash-Next-UD-IQ4_XS-00003-of-00003.gguf` | 43,836,407,744 | `d4634e6d84f0ebb0940be15c90d3790bf6464e3dea3a1cddc567dc0e83ad8833` |
+
+Total: `93,682,584,224` bytes. Verify before launching:
+
+```bash
+sha256sum "$MODEL_DIR"/*.gguf
+```
+
+## Safe launch
+
+Copy this recipe directory to Spark or set `SPARK_GUARD` to the deployed guard,
+then review `env.example`:
+
+```bash
+set -a
+source env.example
+set +a
+./run.sh
+```
+
+Defaults:
+
+- loopback bind only
+- context 4,096
+- one server slot
+- prompt cache disabled for honest TTFT
+- F16 KV
+- all normal layers on CUDA
+- PLE lazy mmap on CPU
+- no speculative decoding
+- 80 GiB minimum `MemAvailable` before start
+- SIGTERM below 36 GiB; SIGKILL below 28 GiB
+- soft stop if swap grows by more than 1 GiB
+
+Binding outside loopback requires `API_KEY`.
+
+`SPEC_TYPE=ngram-mod` is accepted for explicitly labeled copy/edit experiments,
+but it is not the default and must never be reported as general model speed.
+
+## Measured performance
+
+The selected short-prompt configuration reached:
+
+- steady prompt-cache-disabled TTFT: **0.551 seconds**
+- steady decode: **approximately 25 tok/s**
+- native 262,144-token allocation: successful
+- 229,874-token prompt: **1,218.85-second TTFT**, **5.60 tok/s decode**
+- minimum available memory in the full-depth run: **39.53 GiB**
+
+See [`results/summary.md`](results/summary.md) for configuration sweeps,
+context-depth results, task-shape data, raw-file provenance, and rejected
+experiments.
+
+## Reproduce benchmark inputs
+
+Start the server at the desired context, then generate deterministic prompt
+files through its tokenizer:
+
+```bash
+python3 tools/generate_context_prompts.py \
+  --base-url http://127.0.0.1:8081 \
+  --output-dir /tmp/qwen38-context-prompts \
+  --targets 1024,4096,16384,32768,65536,131072,230000
+```
+
+Measure streaming TTFT and post-first-token decode:
+
+```bash
+python3 tools/stream_benchmark.py \
+  --base-url http://127.0.0.1:8081 \
+  --model qwen38-ud-iq4-xs \
+  --prompt-file prompts/short.txt \
+  --max-tokens 128 \
+  --context-label ctx4096-short \
+  --warmup-count 1 \
+  --repetitions 5 \
+  --timeout 300 \
+  --jsonl-out results/raw/local-run.jsonl
+```
+
+Task-shape experiments use `--variation-placeholder @` so repeated requests
+cannot train a speculative cache on an identical output.
+
+## Rejected experiments and host safety
+
+- A port of the comparison repository's Qwen4Exp graph-reuse patch reached
+  `graphs reused = 127`, then segfaulted on the second request. It was removed.
+- Kernel logs showed NVIDIA `NV_ERR_NO_MEMORY` during that experiment.
+- The host later rebooted without a clean shutdown. Multiple NVIDIA OOM events
+  from other workloads were also present, so sole causality is unproven.
+- Whole-table PLE prewarming is excluded: it consumes tens of GiB and the
+  comparison repository's later measurements show no prose benefit.
+- Quantized KV is excluded from this candidate because current Qwen4Exp support
+  has had quantized-KV correctness failures.
+
+After a reboot or NVIDIA OOM, do not immediately relaunch. Confirm host uptime,
+GPU process state, `nvidia-smi`, disk headroom, and `MemAvailable` first.
+
+## Provenance and credit
+
+- Qwen model weights: Qwen Community License
+- GGUF conversion: Unsloth
+- Runtime architecture support: llama.cpp PR #27742
+- Comparison methodology reviewed from
+  [`0xBakeer/qwen38-flash-next-spark`](https://github.com/0xBakeer/qwen38-flash-next-spark)
+  commit `4c6fc3af429bff5c472511cf965751eac6b7caf2`
+
+That comparison repository is MIT licensed, Copyright (c) 2026 0xBakeer. Its
+methodology informed the varied task suite and the now-rejected graph-reuse
+experiment; this recipe does not ship its patch or tools.
+
+## Status
+
+- Recipe ID: `llama-cpp/qwen38-flash-next-ud-iq4-xs`
+- Runtime ID: `llama-cpp`
+- Manifest status: `draft`
+- Publication status: local only; no push is authorized

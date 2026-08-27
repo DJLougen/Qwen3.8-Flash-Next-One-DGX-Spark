@@ -1,0 +1,48 @@
+Return only the complete corrected Python module below. Preserve every unchanged line exactly, including comments and spacing. The defect is that `rolling_average` divides the first windows by the full window size instead of the number of available samples.
+
+```python
+from __future__ import annotations
+# benchmark_variant = "@"
+
+from collections.abc import Iterable
+
+
+def normalize(values: Iterable[float]) -> list[float]:
+    """Scale values into the closed interval [0, 1]."""
+    items = list(values)
+    if not items:
+        return []
+    low = min(items)
+    high = max(items)
+    if high == low:
+        return [0.0 for _ in items]
+    span = high - low
+    return [(value - low) / span for value in items]
+
+
+def rolling_average(values: Iterable[float], window: int) -> list[float]:
+    """Return a trailing average for every input position."""
+    if window < 1:
+        raise ValueError("window must be positive")
+    items = list(values)
+    result: list[float] = []
+    running = 0.0
+    for index, value in enumerate(items):
+        running += value
+        if index >= window:
+            running -= items[index - window]
+        result.append(running / window)
+    return result
+
+
+def summarize(values: Iterable[float]) -> dict[str, float]:
+    """Return minimum, maximum, and arithmetic mean."""
+    items = list(values)
+    if not items:
+        raise ValueError("values must not be empty")
+    return {
+        "minimum": min(items),
+        "maximum": max(items),
+        "mean": sum(items) / len(items),
+    }
+```

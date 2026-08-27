@@ -1,0 +1,19 @@
+{
+  "$schema": "../../../schema/recipe.schema.json",
+  "schema_version": 1,
+  "id": "llama-cpp/qwen38-flash-next-ud-iq4-xs",
+  "title": "Qwen3.8 Flash Next UD-IQ4_XS",
+  "summary": "Local-only llama.cpp optimization recipe for the UD-IQ4_XS quant on DGX Spark.",
+  "runtime": "llama-cpp",
+  "model": {
+    "repository": "unsloth/Qwen3.8-Flash-Next-GGUF",
+    "revision": "ff34bcdd8a6ecffbe75b392e57b866df8f6bba8f"
+  },
+  "hardware": {
+    "target": "NVIDIA DGX Spark",
+    "gpu": "GB10"
+  },
+  "entrypoint": "run.sh",
+  "status": "draft",
+  "tested_at": null
+}

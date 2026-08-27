@@ -1,0 +1,12 @@
+{
+  "source_log": "/home/djl/benchmarks/qwen38-ud-iq4-xs/logs/server-ctx262144-f16-guard.jsonl",
+  "sample_count": 3003,
+  "preflight_available_gib": 112.4758415222168,
+  "minimum_available_gib": 39.52749252319336,
+  "maximum_swap_used_gib": 0.6555023193359375,
+  "soft_stop_available_gib": 36,
+  "hard_kill_available_gib": 28,
+  "final_event": "interrupt",
+  "final_stop_reason": "signal_interrupt",
+  "note": "Operator interrupt was sent after the 229874-token request completed successfully."
+}

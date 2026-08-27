@@ -1,0 +1,24 @@
+Given the module below, return only a new `percentile_@(values, q)` function that fits its style. It must reject an empty iterable, require `q` in [0, 1], sort without mutating caller data, and use linear interpolation between adjacent ranks.
+
+```python
+from __future__ import annotations
+
+from collections.abc import Iterable
+
+
+def mean(values: Iterable[float]) -> float:
+    items = list(values)
+    if not items:
+        raise ValueError("values must not be empty")
+    return sum(items) / len(items)
+
+
+def median(values: Iterable[float]) -> float:
+    items = sorted(values)
+    if not items:
+        raise ValueError("values must not be empty")
+    middle = len(items) // 2
+    if len(items) % 2:
+        return items[middle]
+    return (items[middle - 1] + items[middle]) / 2
+```
