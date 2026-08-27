@@ -1,0 +1,139 @@
+{
+  "experiment": "LLAMA_MMAP_LAZY_ADVICE A/B on per_layer_token_embd",
+  "decision": "reject",
+  "decision_reason": "NORMAL and SEQUENTIAL preserved temperature-0 output hashes but increased PLE page residency and worsened cold TTFT versus RANDOM. Neither met the ~3% gain bar without extra table residency. Keep PR #27742 POSIX_MADV_RANDOM. Do not ship the env override.",
+  "date": "2026-08-27",
+  "host": "spark-d500 NVIDIA DGX Spark GB10",
+  "build": {
+    "tree": "/home/djl/llama.cpp-qwen4exp-advice",
+    "commit": "250b61446efc91e3a179c8677956f2667c8fbda0",
+    "version": "0.3.0-dev (build 2757, commit 250b61446)",
+    "patch": "patches/ple-lazy-advice.patch",
+    "binary": "/home/djl/llama.cpp-qwen4exp-advice/build/bin/llama-server"
+  },
+  "workload": {
+    "prompt_file": "prompts/short.txt",
+    "prompt_sha256": "d35d6e2c5385395e0c2d6ee60d6234b354b6b34540eb54423d21f6df7ae8f05d",
+    "prompt_tokens": 76,
+    "output_tokens": 128,
+    "processed_tokens": 204,
+    "context": 4096,
+    "parallel": 1,
+    "threads": 12,
+    "batch": 512,
+    "ubatch": 128,
+    "flash_attn": true,
+    "kv": "f16",
+    "ple_override": "per_layer_token_embd=CPU",
+    "load_mode": "mmap",
+    "tensor_read_lazy": true,
+    "prompt_cache": false
+  },
+  "output_sha256": "cb7904d8097240a2bc32c77e27c03a924fcb972212566d14487d20d2aa687601",
+  "output_chars": 746,
+  "prior_unpatched_random_baseline": {
+    "source": "results/raw/ple-baseline-profile.json",
+    "cold_ttft_seconds": 1.490,
+    "cold_decode_tokens_per_second": 24.128,
+    "cold_major_fault_delta": 5147,
+    "ple_pages_after_load": 66,
+    "ple_pages_after_cold": 2677,
+    "steady_ttft_median_seconds": 0.634,
+    "steady_decode_median_tokens_per_second": 26.194
+  },
+  "arms": {
+    "random": {
+      "env": "LLAMA_MMAP_LAZY_ADVICE=random",
+      "port": 8111,
+      "pid": 29259,
+      "jsonl": "results/raw/ple-advice-prototype-random.jsonl",
+      "ple_pages_after_load": 66,
+      "ple_pages_after_cold": 2677,
+      "ple_pages_added": 2611,
+      "ple_resident_gib_after_cold": 0.010211944580078125,
+      "major_faults_before": 11801,
+      "major_faults_after_cold": 16943,
+      "major_fault_delta": 5142,
+      "minor_fault_delta": 140453,
+      "cold_ttft_seconds": 1.9108646249999999,
+      "cold_decode_tokens_per_second": 22.167957919989117,
+      "hash_match": true
+    },
+    "normal": {
+      "env": "LLAMA_MMAP_LAZY_ADVICE=normal",
+      "port": 8112,
+      "pid": 31925,
+      "jsonl": "results/raw/ple-advice-prototype-normal.jsonl",
+      "ple_pages_after_load": 4097,
+      "ple_pages_after_cold": 164336,
+      "ple_pages_added": 160239,
+      "ple_resident_gib_after_cold": 0.62689208984375,
+      "major_faults_before": 15802,
+      "major_faults_after_cold": 20990,
+      "major_fault_delta": 5188,
+      "minor_fault_delta": 140522,
+      "cold_ttft_seconds": 2.1685156670000003,
+      "cold_decode_tokens_per_second": 23.260942529164023,
+      "steady_ttft_median_seconds": 0.97132825,
+      "steady_decode_median_tokens_per_second": 25.257792525797086,
+      "hash_match": true
+    },
+    "sequential": {
+      "env": "LLAMA_MMAP_LAZY_ADVICE=sequential",
+      "port": 8113,
+      "pid": 34592,
+      "jsonl": "results/raw/ple-advice-prototype-sequential.jsonl",
+      "ple_pages_after_load": 1,
+      "ple_pages_after_cold": 37653,
+      "ple_pages_added": 37652,
+      "ple_resident_gib_after_cold": 0.14363479614257812,
+      "major_faults_before": 7934,
+      "major_faults_after_cold": 12996,
+      "major_fault_delta": 5062,
+      "minor_fault_delta": 140502,
+      "cold_ttft_seconds": 2.296416958,
+      "cold_decode_tokens_per_second": 22.26179615052867,
+      "hash_match": true
+    }
+  },
+  "guard": {
+    "soft_stop_available_gib": 45,
+    "hard_kill_available_gib": 38,
+    "max_swap_growth_gib": 1,
+    "random": {
+      "minimum_available_gib": 50.37697219848633,
+      "maximum_swap_used_gib": 0.5898475646972656,
+      "final_stop_reason": "signal_interrupt"
+    },
+    "normal": {
+      "minimum_available_gib": 50.36756134033203,
+      "maximum_swap_used_gib": 0.5927352905273438,
+      "final_stop_reason": "signal_interrupt"
+    },
+    "sequential": {
+      "minimum_available_gib": 50.30535888671875,
+      "maximum_swap_used_gib": 0.5985183715820312,
+      "final_stop_reason": "signal_interrupt"
+    },
+    "kernel_fault_check": {
+      "window": "journalctl -k --since '30 min ago'",
+      "new_nvidia_oom_xid_or_nv_err_entries": 0
+    }
+  },
+  "comparisons_versus_prototype_random": {
+    "normal_cold_ttft_delta_percent": 13.5,
+    "normal_cold_decode_delta_percent": 4.9,
+    "normal_ple_pages_after_cold_ratio": 61.4,
+    "sequential_cold_ttft_delta_percent": 20.2,
+    "sequential_cold_decode_delta_percent": 0.4,
+    "sequential_ple_pages_after_cold_ratio": 14.1
+  },
+  "remaining_experiments_not_run": [
+    "posix_fadvise FADV_SEQUENTIAL vs NORMAL/RANDOM on GGUF files that contain lazy ranges",
+    "thresholded multithreaded ggml GET_ROWS for large PLE prefill gathers only",
+    "page-sort and deduplicate PLE row IDs before dequant",
+    "explicit preadv/async reads",
+    "hot-row cache after measuring access skew",
+    "PLE-only quantization or layout redesign"
+  ]
+}

@@ -1,0 +1,40 @@
+diff --git a/src/llama-mmap.cpp b/src/llama-mmap.cpp
+index 4d183cbc9..0075de049 100644
+--- a/src/llama-mmap.cpp
++++ b/src/llama-mmap.cpp
+@@ -5,6 +5,7 @@
+ #include "ggml.h"
+ 
+ #include <cstring>
++#include <cstdlib>
+ #include <climits>
+ #include <stdexcept>
+ #include <cerrno>
+@@ -501,8 +502,26 @@ struct llama_mmap::impl {
+                 advise(range.first, range.second, POSIX_MADV_WILLNEED, "POSIX_MADV_WILLNEED");
+             }
+         }
++        int lazy_advice = POSIX_MADV_RANDOM;
++        const char * lazy_advice_name = "POSIX_MADV_RANDOM";
++        if (const char * value = std::getenv("LLAMA_MMAP_LAZY_ADVICE")) {
++            if (std::strcmp(value, "normal") == 0) {
++                lazy_advice = POSIX_MADV_NORMAL;
++                lazy_advice_name = "POSIX_MADV_NORMAL";
++            } else if (std::strcmp(value, "sequential") == 0) {
++                lazy_advice = POSIX_MADV_SEQUENTIAL;
++                lazy_advice_name = "POSIX_MADV_SEQUENTIAL";
++            } else if (std::strcmp(value, "random") != 0) {
++                LLAMA_LOG_WARN(
++                    "warning: invalid LLAMA_MMAP_LAZY_ADVICE=%s; using random\n",
++                    value);
++            }
++        }
++        if (!lazy_ranges.empty()) {
++            LLAMA_LOG_INFO("lazy mmap advice: %s\n", lazy_advice_name);
++        }
+         for (const auto & range : lazy_ranges) {
+-            advise(range.first, range.second, POSIX_MADV_RANDOM, "POSIX_MADV_RANDOM");
++            advise(range.first, range.second, lazy_advice, lazy_advice_name);
+         }
+         if (numa) {
+             if (posix_madvise(addr, file->size(), POSIX_MADV_RANDOM)) {

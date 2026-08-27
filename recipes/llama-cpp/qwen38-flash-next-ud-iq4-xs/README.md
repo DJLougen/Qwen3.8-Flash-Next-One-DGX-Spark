@@ -161,6 +161,9 @@ cannot train a speculative cache on an identical output.
   from other workloads were also present, so sole causality is unproven.
 - Whole-table PLE prewarming is excluded: it consumes tens of GiB and the
   comparison repository's later measurements show no prose benefit.
+- Switching PLE lazy-range advice from `POSIX_MADV_RANDOM` to `NORMAL` or
+  `SEQUENTIAL` preserved output hashes but grew table residency (0.63 GiB and
+  0.14 GiB vs 0.01 GiB) and worsened cold TTFT. Keep `RANDOM`.
 - Quantized KV is excluded from this candidate because current Qwen4Exp support
   has had quantized-KV correctness failures.
 

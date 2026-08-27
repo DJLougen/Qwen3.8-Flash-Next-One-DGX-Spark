@@ -1,0 +1,49 @@
+{
+  "build_commit": "250b61446efc91e3a179c8677956f2667c8fbda0",
+  "mode": "POSIX_MADV_RANDOM current baseline",
+  "model": {
+    "ple_tensor": "per_layer_token_embd.weight",
+    "shape": [160, 320001536],
+    "type": "IQ4_NL",
+    "length_bytes": 28800138240,
+    "length_gib": 26.822218894958496,
+    "row_bytes": 90,
+    "rows_per_token": 16
+  },
+  "load": {
+    "wall_seconds_to_ready": 77,
+    "ple_resident_pages_before_load": 2,
+    "ple_resident_pages_after_load": 66,
+    "page_size": 4096
+  },
+  "cold_request": {
+    "prompt_tokens": 76,
+    "output_tokens": 128,
+    "ttft_seconds": 1.490,
+    "decode_tokens_per_second": 24.128,
+    "process_minor_faults_before": 8886891,
+    "process_major_faults_before": 4490,
+    "process_minor_faults_after": 9027341,
+    "process_major_faults_after": 9637,
+    "minor_fault_delta": 140450,
+    "major_fault_delta": 5147,
+    "ple_resident_pages_after": 2677,
+    "ple_pages_added": 2611,
+    "ple_pages_added_per_processed_token": 12.799019607843137,
+    "ple_resident_gib_after": 0.010211944580078125
+  },
+  "steady_repeated_prompt": {
+    "measured_requests": 3,
+    "processed_tokens": 612,
+    "ttft_median_seconds": 0.634,
+    "decode_median_tokens_per_second": 26.194,
+    "process_minor_faults_after": 9200959,
+    "process_major_faults_after": 9647,
+    "minor_fault_delta": 173618,
+    "major_fault_delta": 10
+  },
+  "notes": [
+    "Process major faults include non-PLE mappings; PLE mincore isolates table residency.",
+    "The steady repeated-prompt run reuses OS page-cache rows and is not a cold-distribution benchmark."
+  ]
+}

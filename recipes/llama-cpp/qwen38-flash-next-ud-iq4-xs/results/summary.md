@@ -143,6 +143,57 @@ the server; it is excluded. The synchronized streaming probe and server logs
 are the accepted evidence. Concurrency 2 is therefore proven for this bounded
 4K-per-slot case. Higher concurrency remains untested.
 
+
+## PLE lookup research
+
+The “51B n-gram” path is a learned **per-layer token embedding** table, not
+llama.cpp speculative decoding. Exact GGUF metadata:
+
+```text
+tensor: per_layer_token_embd.weight
+shape: [160, 320001536]
+type: IQ4_NL
+size: 28,800,138,240 bytes (26.82 GiB)
+row: 90 bytes
+lookups per token: 16 (8 bigram + 8 trigram hash partitions)
+```
+
+Each token hashes prior tokens with 16 independent 64-bit multipliers, reduces
+modulo ~20M rows per partition, then runs 16 CPU `ggml_get_rows` gathers.
+Useful compressed data is about 1.44 KiB/token, but rows are scattered across
+the 26.82 GiB shard. A 4 KiB major fault for a 90-byte row is up to ~45× read
+amplification.
+
+PR #27742 already marks the tensor lazy, skips `MAP_POPULATE`, applies
+`POSIX_MADV_RANDOM` to the PLE range, and leaves 66 pages resident after load.
+
+### Lazy mmap advice A/B — rejected
+
+An isolated clone at commit `250b61446` added a reversible
+`LLAMA_MMAP_LAZY_ADVICE={random,normal,sequential}` selector
+(`patches/ple-lazy-advice.patch`). Same binary, same short prompt, PLE pages
+dropped before each arm. Temperature-0 output hash
+`cb7904d8097240a2bc32c77e27c03a924fcb972212566d14487d20d2aa687601` matched all
+three arms. No NVIDIA OOM/Xid/`NV_ERR` entries. Guard floors stayed above
+50 GiB available; swap stayed under 0.60 GiB.
+
+| Advice | Cold TTFT | Cold decode | PLE pages after load | PLE pages after cold | PLE GiB after cold |
+|---|---:|---:|---:|---:|---:|
+| `RANDOM` (current) | 1.911 s | 22.168 tok/s | 66 | 2,677 | 0.010 |
+| `NORMAL` | 2.169 s | 23.261 tok/s | 4,097 | 164,336 | 0.627 |
+| `SEQUENTIAL` | 2.296 s | 22.262 tok/s | 1 | 37,653 | 0.144 |
+
+`NORMAL` readahead pulled ~61× more PLE pages and slowed TTFT. `SEQUENTIAL`
+pulled ~14× more pages and slowed TTFT further. The single-run `NORMAL` decode
+bump is inside noise and disappears against the earlier unpatched RANDOM
+baseline (24.13 tok/s cold / 26.19 tok/s steady). Keep `POSIX_MADV_RANDOM`.
+Do not ship the env override.
+
+Remaining untested directions, in the same safety order: fix whole-file
+`posix_fadvise(..., POSIX_FADV_SEQUENTIAL)` on lazy GGUF files; thresholded
+multithreaded `GET_ROWS` for large prefill gathers; page-sorted/deduplicated
+row gathers. Explicit I/O, hot-row caches, and layout/quant redesign stay last.
+
 ## Invalid and rejected experiments
 
 ### Repeated-prompt `ngram-mod`
@@ -180,4 +231,11 @@ The comparison repository is MIT licensed, Copyright (c) 2026 0xBakeer. Its meth
 
 - `raw/concurrency-np2-ctx8192.jsonl`: three parallel-two request batches
 - `raw/concurrency-np2-ctx8192-guard-summary.json`: memory, swap, stop, and kernel-fault evidence
+- `raw/ple-baseline-profile.json`: unpatched RANDOM PLE fault/residency profile
+- `raw/ple-advice-random.jsonl`: unpatched RANDOM cold+steady timings
+- `raw/ple-advice-ab.json`: isolated mmap-advice A/B decision record
+- `raw/ple-advice-prototype-random.jsonl`: patched RANDOM arm
+- `raw/ple-advice-prototype-normal.jsonl`: patched NORMAL arm
+- `raw/ple-advice-prototype-sequential.jsonl`: patched SEQUENTIAL arm
+- `patches/ple-lazy-advice.patch`: rejected env-selector prototype
 All raw files are local-only until the user explicitly approves a release.
