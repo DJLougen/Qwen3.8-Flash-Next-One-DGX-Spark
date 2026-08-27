@@ -96,6 +96,7 @@ The selected short-prompt configuration reached:
 - native 262,144-token allocation: successful
 - 229,874-token prompt: **1,218.85-second TTFT**, **5.60 tok/s decode**
 - minimum available memory in the full-depth run: **39.53 GiB**
+- parallel 2 at 8,192 total context: **0.853-second median TTFT per request**, **20.68 tok/s per request**, **32.82 aggregate output tok/s**, with 50.61 GiB minimum available memory
 
 See [`results/summary.md`](results/summary.md) for configuration sweeps,
 context-depth results, task-shape data, raw-file provenance, and rejected
@@ -126,6 +127,26 @@ python3 tools/stream_benchmark.py \
   --repetitions 5 \
   --timeout 300 \
   --jsonl-out results/raw/local-run.jsonl
+```
+
+Reproduce the proven two-slot probe only with the stricter guard floors:
+
+```bash
+PARALLEL=2 \
+CONTEXT_SIZE=8192 \
+MIN_START_MEM_GIB=100 \
+SOFT_STOP_MEM_GIB=45 \
+HARD_KILL_MEM_GIB=38 \
+./run.sh
+
+python3 tools/concurrent_benchmark.py \
+  --base-url http://127.0.0.1:8081 \
+  --model qwen38-ud-iq4-xs \
+  --prompt alpha=prompts/short.txt \
+  --prompt beta=prompts/concurrency-b.txt \
+  --max-tokens 64 \
+  --repetitions 3 \
+  --jsonl-out results/raw/concurrency-np2-ctx8192.jsonl
 ```
 
 Task-shape experiments use `--variation-placeholder @` so repeated requests

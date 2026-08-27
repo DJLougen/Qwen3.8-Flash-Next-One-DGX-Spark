@@ -102,6 +102,47 @@ The literal `@` in each prompt is replaced with a different deterministic identi
 
 This supports an honest general-purpose headline of approximately **24–25 tok/s**, not the copy-only speculative headline from another repository.
 
+## Parallel-two concurrency probe
+
+Configuration: `--parallel 2`, total context 8,192, approximately 4,096
+tokens per slot, two synchronized fixed prompts, 64 output tokens each,
+speculation off.
+
+The first launch was deliberately stopped before model readiness when swap
+growth crossed an overly strict 0.5 GiB limit. No model error occurred. The
+second launch used the same 45/38 GiB memory floors with a 1 GiB swap-growth
+limit and completed three measured concurrent batches.
+
+| Metric | Request alpha | Request beta | Pair aggregate |
+|---|---:|---:|---:|
+| First-batch TTFT | 2.444 s | 2.443 s | — |
+| First-batch decode | 17.741 tok/s | 17.737 tok/s | 21.349 output tok/s |
+| Median TTFT, 3 batches | 0.853 s | 0.853 s | — |
+| Median decode, 3 batches | 20.691 tok/s | 20.678 tok/s | **32.824 output tok/s** |
+| Maximum start skew | — | — | 0.288 ms |
+
+Both requests succeeded in all three batches with no API errors. Each request
+produced one stable, nonempty output hash across all repetitions:
+
+- alpha: `912ec93d10435ab11a26dabbeaea9259d94ef82cca443043c3736715cd16ff43`
+  (413 output characters)
+- beta: `048906166cf180fdd67392ad058e6653bd7029eed6934305462fd7c4f2c9623d`
+  (371 output characters)
+
+Server logs showed both slots processing together and all six requests
+finishing with 64 generated tokens. There were no QSA/indexer assertions,
+server errors, new NVIDIA OOM/Xid/NV_ERR kernel entries, soft stops, or hard
+kills. Memory evidence:
+
+- Preflight `MemAvailable`: 112.98 GiB
+- Minimum `MemAvailable`: 50.61 GiB
+- Maximum swap used: 0.57 GiB
+
+A separate non-streaming verification client stalled locally and did not reach
+the server; it is excluded. The synchronized streaming probe and server logs
+are the accepted evidence. Concurrency 2 is therefore proven for this bounded
+4K-per-slot case. Higher concurrency remains untested.
+
 ## Invalid and rejected experiments
 
 ### Repeated-prompt `ngram-mod`
@@ -137,4 +178,6 @@ The comparison repository is MIT licensed, Copyright (c) 2026 0xBakeer. Its meth
 - `raw/tasks-varied-spec-off.jsonl`: task-shape baseline with per-run prompt variation
 - `raw/tasks-ngram-mod.jsonl`: contaminated repeated-prompt pilot; excluded
 
+- `raw/concurrency-np2-ctx8192.jsonl`: three parallel-two request batches
+- `raw/concurrency-np2-ctx8192-guard-summary.json`: memory, swap, stop, and kernel-fault evidence
 All raw files are local-only until the user explicitly approves a release.

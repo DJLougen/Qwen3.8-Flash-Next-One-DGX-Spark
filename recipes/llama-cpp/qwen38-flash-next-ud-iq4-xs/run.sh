@@ -16,6 +16,7 @@ LOG_DIR="${LOG_DIR:-${SCRIPT_DIR}/results/guard}"
 HOST="${HOST:-127.0.0.1}"
 PORT="${PORT:-8081}"
 CONTEXT_SIZE="${CONTEXT_SIZE:-4096}"
+PARALLEL="${PARALLEL:-1}"
 THREADS="${THREADS:-12}"
 BATCH_SIZE="${BATCH_SIZE:-512}"
 UBATCH_SIZE="${UBATCH_SIZE:-128}"
@@ -39,10 +40,31 @@ if [[ ! -x "$LLAMA_SERVER" ]]; then
     printf 'error: llama-server is not executable: %s\n' "$LLAMA_SERVER" >&2
     exit 2
 fi
+for numeric_name in CONTEXT_SIZE PARALLEL THREADS BATCH_SIZE UBATCH_SIZE \
+    MIN_START_MEM_GIB SOFT_STOP_MEM_GIB HARD_KILL_MEM_GIB MAX_SWAP_GROWTH_GIB; do
+    if ! [[ "${!numeric_name}" =~ ^[0-9]+$ ]]; then
+        printf 'error: %s must be a nonnegative integer\n' "$numeric_name" >&2
+        exit 2
+    fi
+done
+if (( PARALLEL < 1 || PARALLEL > 2 )); then
+    printf 'error: only proven PARALLEL values 1 and 2 are allowed\n' >&2
+    exit 2
+fi
 if ! [[ "$CONTEXT_SIZE" =~ ^[0-9]+$ ]] ||
     (( CONTEXT_SIZE < 512 || CONTEXT_SIZE > 262144 )); then
     printf 'error: CONTEXT_SIZE must be an integer from 512 through 262144\n' >&2
     exit 2
+fi
+if (( PARALLEL == 2 )); then
+    if (( CONTEXT_SIZE != 8192 )); then
+        printf 'error: proven PARALLEL=2 configuration requires CONTEXT_SIZE=8192\n' >&2
+        exit 2
+    fi
+    if (( MIN_START_MEM_GIB < 100 || SOFT_STOP_MEM_GIB < 45 || HARD_KILL_MEM_GIB < 38 )); then
+        printf 'error: PARALLEL=2 requires guard floors 100/45/38 GiB or stricter\n' >&2
+        exit 2
+    fi
 fi
 if [[ "$HOST" != "127.0.0.1" && "$HOST" != "localhost" && -z "$API_KEY" ]]; then
     printf 'error: API_KEY is required when binding beyond loopback\n' >&2
@@ -62,7 +84,7 @@ server_args=(
     --host "$HOST"
     --port "$PORT"
     -c "$CONTEXT_SIZE"
-    -np 1
+    -np "$PARALLEL"
     -b "$BATCH_SIZE"
     -ub "$UBATCH_SIZE"
     -t "$THREADS"
