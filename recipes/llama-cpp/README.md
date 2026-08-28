@@ -139,18 +139,14 @@ Only record numbers you actually ran on Spark; store methodology in the recipe R
 
 ---
 
-## Candidate recipe matrix (not yet in repo)
+## Recipes in this lane
 
-The slugs below are **planning targets** for authors. They are **not** checked-in recipes and have **no verified commands** until someone scaffolds, runs, and documents them on Spark.
+| Slug | Intent | Status |
+|------|--------|--------|
+| [`qwen38-flash-next-ud-iq4-xs`](qwen38-flash-next-ud-iq4-xs/) | Unsloth `UD-IQ4_XS` GGUF on 1× GB10; unpatched `run.sh` plus experimental QSA kernel notes | `draft` |
 
-| Planned slug (example) | Intent | Primary focus | Draft until |
-|------------------------|--------|---------------|-------------|
-| `*-gguf-baseline` | Reference **Q4_K_M** (or model-card default) GGUF | Correctness, simplest CLI path | GGUF provenance + chat template + `-ngl` documented |
-| `*-gguf-quality` | Higher-bit or IQ quant (e.g. Q8_0 / Q6_K) | Output quality vs size | Side-by-side quality notes vs baseline (same prompts) |
-| `*-gguf-memory` | Aggressive quant (e.g. Q4_0 / IQ4_XS) | Footprint on unified memory | Peak memory observations + acceptable quality tradeoffs stated |
-| `*-llama-server-openai` | **`llama-server`** OpenAI-compatible API | Serving / integration testing | Server flags, endpoint smoke test, load methodology recorded |
-
-Scaffold with `--runtime llama-cpp` and a slug matching your chosen row; keep `status: draft` until every checklist section is satisfied and `tested_at` is set.
+Further slugs (baseline Q4_K_M, quality Q8, OpenAI server variants) remain
+planning targets until someone scaffolds and measures them.
 
 ---
 

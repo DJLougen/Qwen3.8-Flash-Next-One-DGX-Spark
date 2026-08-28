@@ -1,6 +1,8 @@
 # Local UD-IQ4_XS benchmark summary
 
-> **Local draft — do not publish yet.** These results are for release-candidate development, not a public performance claim.
+> Unpatched recipe measurements on one DGX Spark. Status remains `draft`.
+> Experimental QSA kernel numbers are in [`qsa-kernels.md`](qsa-kernels.md)
+> and must not be mixed with the ~25 tok/s short-prompt figure below.
 
 Measured on 2026-08-27 using one NVIDIA DGX Spark (GB10), llama.cpp PR #27742 commit `250b61446`, CUDA 13.0.2, driver 580.159.03, and Unsloth `UD-IQ4_XS` at revision `ff34bcdd8a6ecffbe75b392e57b866df8f6bba8f`.
 
@@ -238,4 +240,5 @@ The comparison repository is MIT licensed, Copyright (c) 2026 0xBakeer. Its meth
 - `raw/ple-advice-prototype-normal.jsonl`: patched NORMAL arm
 - `raw/ple-advice-prototype-sequential.jsonl`: patched SEQUENTIAL arm
 - `patches/ple-lazy-advice.patch`: rejected env-selector prototype
-All raw files are local-only until the user explicitly approves a release.
+Raw JSONL in this directory is the unpatched recipe evidence. Kernel-track
+timings are documented in [`qsa-kernels.md`](qsa-kernels.md), not these files.

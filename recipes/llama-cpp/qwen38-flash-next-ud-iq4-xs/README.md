@@ -1,10 +1,12 @@
 # Qwen3.8 Flash Next UD-IQ4_XS on DGX Spark
 
-> **Local release-candidate draft. Do not publish yet.**
+> **Draft, measured on one DGX Spark.** Status stays `draft` because llama.cpp
+> Qwen4Exp is still [PR #27742](https://github.com/ggml-org/llama.cpp/pull/27742)
+> and the experimental QSA kernel patch is not the default `run.sh` path.
 >
-> This recipe is measured on one DGX Spark, but it remains `draft` because the
-> supporting llama.cpp architecture is an open PR and an experimental graph-reuse
-> patch caused a server crash. Only the unpatched configuration below is allowed.
+> Default launch is the **unpatched** configuration below. Kernel numbers live
+> in [`results/qsa-kernels.md`](results/qsa-kernels.md) and use a different
+> prompt protocol than the ~25 tok/s short-prompt figure.
 
 ## Scope
 
@@ -102,6 +104,15 @@ See [`results/summary.md`](results/summary.md) for configuration sweeps,
 context-depth results, task-shape data, raw-file provenance, and rejected
 experiments.
 
+Experimental QSA kernels (not `run.sh`): 64k greedy-count **18.73 tok/s** vs
+unpatched **11.35 tok/s** on that protocol; 128k **15.35 tok/s** (PDL) /
+**13.96 tok/s** (`__ldg`). See [`results/qsa-kernels.md`](results/qsa-kernels.md).
+
+NVFP4 / 2×GB10 SGLang numbers from
+[r0b0tlab/Qwen3.8-Flash-Next-NVFP4-W4A16-sm121](https://huggingface.co/r0b0tlab/Qwen3.8-Flash-Next-NVFP4-W4A16-sm121)
+are a different stack. Comparison:
+[`docs/comparison-nvfp4-w4a16-sglang.md`](../../../docs/comparison-nvfp4-w4a16-sglang.md).
+
 ## Reproduce benchmark inputs
 
 Start the server at the desired context, then generate deterministic prompt
@@ -188,4 +199,4 @@ experiment; this recipe does not ship its patch or tools.
 - Recipe ID: `llama-cpp/qwen38-flash-next-ud-iq4-xs`
 - Runtime ID: `llama-cpp`
 - Manifest status: `draft`
-- Publication status: local only; no push is authorized
+- Publication status: in-tree draft; SGLang/vLLM lanes remain empty

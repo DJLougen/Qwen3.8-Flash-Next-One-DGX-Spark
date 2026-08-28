@@ -1,52 +1,71 @@
 # Qwen3.8 Flash Next One — DGX Spark inference recipes
 
-A workspace for developing reproducible inference recipes for **NVIDIA DGX Spark** (GB10). Each future recipe will bundle manifest metadata, environment hints, and an executable entrypoint for a specific **runtime lane** and **model revision**.
+Reproducible inference recipes for **Qwen3.8-Flash-Next** on **NVIDIA DGX Spark**
+(GB10). Each recipe is a directory with a manifest, environment template,
+operator notes, and an executable entrypoint for one **runtime lane** and
+**model revision**.
 
-> [!IMPORTANT]
-> **This initial repository is setup-only.** It intentionally establishes the structure, authoring templates, validation, and runtime lanes before any inference recipe is published. Recipes will be added incrementally as model conversions, runtime commands, measurements, and Spark validation are formalized. Lane guides and candidate matrices describe where future work belongs; they are not claims that a recipe already exists or works.
+Lanes exist for **SGLang**, **llama.cpp**, and **vLLM**. Only llama.cpp has a
+populated recipe today. SGLang and vLLM stay fail-closed until someone lands
+measured Spark evidence in those directories.
 
-## Current state
+## Current catalog
 
-This repository is a **workspace scaffold**, not a catalog of benchmarked recipes yet.
+| Recipe | Runtime | Weights | Status | What is measured |
+|--------|---------|---------|--------|------------------|
+| [`recipes/llama-cpp/qwen38-flash-next-ud-iq4-xs/`](recipes/llama-cpp/qwen38-flash-next-ud-iq4-xs/) | llama.cpp Qwen4Exp ([PR #27742](https://github.com/ggml-org/llama.cpp/pull/27742)) | [unsloth/Qwen3.8-Flash-Next-GGUF](https://huggingface.co/unsloth/Qwen3.8-Flash-Next-GGUF) `UD-IQ4_XS` @ `ff34bcdd8a6ecffbe75b392e57b866df8f6bba8f` | **`draft`** | 1× GB10, no speculative decoding |
 
-- Supported runtime lanes are defined (`sglang`, `llama-cpp`, `vllm`), but lane directories may be empty until contributors land recipes.
-- Generated recipes start as **`draft`** manifests. They **fail closed** until an author supplies a real runtime invocation in `run.sh` and documents how to reproduce results.
-- Nothing here claims verified throughput, latency, or model availability until a recipe is explicitly promoted to **`verified`** with dated evidence (see [CONTRIBUTING.md](CONTRIBUTING.md)).
+It remains `draft` because the llama.cpp architecture is still an open PR, and
+the experimental QSA kernel patch is not the default `run.sh` path.
 
-## Supported runtime lanes
+Headline **unpatched** numbers on one Spark (see the recipe README for
+methodology):
 
-Recipes are grouped by inference backend:
+- short prompt, cache-off: **~25 tok/s** decode, **0.551 s** TTFT, ctx 4096
+- native **262,144** context allocation succeeded
+- 229,874-token prompt: **5.60 tok/s** decode, **1,218.85 s** TTFT
+- parallel 2 @ ctx 8192: **20.68 tok/s/request**, **32.82** aggregate output tok/s
 
-| Lane | Path | Role |
-|------|------|------|
-| SGLang | [recipes/sglang/](recipes/sglang/) | High-throughput GPU serving with SGLang |
-| llama.cpp | [recipes/llama-cpp/](recipes/llama-cpp/) | GGUF / CPU/GPU inference via llama.cpp |
-| vLLM | [recipes/vllm/](recipes/vllm/) | vLLM OpenAI-compatible serving |
+An experimental QSA kernel patch
+([`qsa-lightning-working.patch`](recipes/llama-cpp/qwen38-flash-next-ud-iq4-xs/patches/qsa-lightning-working.patch))
+raised the 64k greedy-count protocol from **11.35 → 18.73 tok/s** with locked
+output hashes. At 128k the same protocol was **15.35 tok/s** (PDL) and
+**13.96 tok/s** (`__ldg` — slower). Different prompt than the 25 tok/s figure.
+Details: [`results/qsa-kernels.md`](recipes/llama-cpp/qwen38-flash-next-ud-iq4-xs/results/qsa-kernels.md).
 
-The canonical registry of supported runtime IDs lives in [`config/runtimes.json`](config/runtimes.json).
+## Not this repository
+
+| Project | Relation |
+|---------|----------|
+| [r0b0tlab/Qwen3.8-Flash-Next-NVFP4-W4A16-sm121](https://huggingface.co/r0b0tlab/Qwen3.8-Flash-Next-NVFP4-W4A16-sm121) + [companion SGLang repo](https://github.com/r0b0tlab/qwen38-flash-next-w4a16-sm121-sglang) | 2× GB10, ModelOpt NVFP4 W4A16, SGLang MTP NEXTN. Different quant, GPU count, and decoder. Comparison notes: [`docs/comparison-nvfp4-w4a16-sglang.md`](docs/comparison-nvfp4-w4a16-sglang.md) |
+| [0xBakeer/qwen38-flash-next-spark](https://github.com/0xBakeer/qwen38-flash-next-spark) | llama.cpp methodology reference. Graph-reuse port **segfaulted** here and is not shipped |
+
+Do not paste their NEXTN 2.48× or NVFP4 tok/s onto this GGUF recipe.
+
+## Runtime lanes
+
+| Lane | Path | State |
+|------|------|-------|
+| llama.cpp | [recipes/llama-cpp/](recipes/llama-cpp/) | One draft recipe + experimental QSA patch |
+| SGLang | [recipes/sglang/](recipes/sglang/) | Empty; use the generator. Related work is r0b0tlab’s NVFP4 stack, not duplicated here |
+| vLLM | [recipes/vllm/](recipes/vllm/) | Empty; use the generator |
+
+Runtime IDs: [`config/runtimes.json`](config/runtimes.json). Catalog rules:
+[recipes/README.md](recipes/README.md).
 
 ## Recipe layout
-
-Each populated recipe is a directory:
 
 ```text
 recipes/<runtime>/<slug>/
 ├── recipe.json    # manifest (schema v1)
-├── README.md      # human notes, reproduction context
-├── run.sh         # executable entrypoint (draft until author completes)
+├── README.md      # operator notes
+├── run.sh         # entrypoint (draft stubs fail closed)
 └── env.example    # non-secret environment template
 ```
 
-- **`<runtime>`** — one of `sglang`, `llama-cpp`, or `vllm`.
-- **`<slug>`** — lowercase identifier (e.g. `qwen3-8-flash-gguf-q4`).
+## Create another draft
 
-Lane-level `README.md` files (when present) describe runtime-specific conventions; the catalog overview is in [recipes/README.md](recipes/README.md).
-
-## Quick start — create a draft recipe
-
-Prerequisites: **Python 3.11+** (stdlib only for repository tooling; no install step).
-
-### Generator CLI (recommended)
+Python 3.11+; stdlib only for repository tooling.
 
 ```bash
 python3 scripts/new_recipe.py \
@@ -58,64 +77,32 @@ python3 scripts/new_recipe.py \
   --revision main
 ```
 
-Optional `--root PATH` targets a non-default repository root. Mutable model refs such as `main` are suitable for a draft; pin an immutable revision before promotion to `verified`.
+Or `make new`. Mutable refs such as `main` are fine for drafts; pin an immutable
+revision before `verified`.
 
-### Interactive Make target
-
-```bash
-make new
-```
-
-The target prompts for the same six fields without interpolating author text into shell source.
-
-The generator rejects unknown runtime IDs, invalid slugs, and existing destinations. It creates a **draft** manifest, substitutes templates, and makes `run.sh` executable. You must still implement the actual inference command before the recipe is runnable.
-
-## Validate recipes
+## Validate
 
 ```bash
-make validate
-# or
-python3 scripts/validate_recipes.py
+make validate   # recipe manifests
+make test       # tooling unit tests
+make check      # both
 ```
 
-The validator scans populated recipe directories, reports actionable diagnostics, and exits nonzero on errors. Runtime lane README files are **not** recipes and are not validated as manifests.
+CI runs the validator and `python3 -m unittest discover -s tests -v`.
+Inference is **not** launched in CI.
 
-## Tests and full check
-
-```bash
-make test    # unit tests for repository tooling
-make check   # validate recipes + unit tests
-```
-
-CI runs the validator and `python3 -m unittest discover -s tests -v` on pushes and pull requests.
-
-## Recipe lifecycle
+## Lifecycle
 
 | Status | Meaning |
 |--------|---------|
-| `draft` | Scaffold or work in progress; may not run; `tested_at` is null |
-| `verified` | Reproduced on DGX Spark GB10 with evidence in the PR; `tested_at` is required (ISO `YYYY-MM-DD`) |
+| `draft` | In progress; `tested_at` is null |
+| `verified` | Reproduced on DGX Spark GB10 with evidence; `tested_at` required (`YYYY-MM-DD`) |
 | `deprecated` | Superseded or unsafe; kept for history |
 
-Promotion from `draft` to `verified` requires the evidence checklist in [CONTRIBUTING.md](CONTRIBUTING.md). Do not mark `verified` without a merged reproduction record.
-
-## DGX Spark reproducibility expectations
-
-Recipes target **NVIDIA DGX Spark** with **GB10** GPUs. Contributors should document:
-
-- Exact **model repository and immutable revision** (commit SHA, artifact digest, or GGUF checksum) for verified recipes.
-- For converted or quantized weights: exact **source revision**, conversion tool/config, bit-width policy, output repository revision, shard index, and checksums.
-- Exact **runtime build or package version** (container image, wheel, or git SHA).
-- **Invocation** — full command or config referenced by `run.sh`, plus any required environment from `env.example`.
-- **Context and concurrency** — max sequence length, batch size, parallel requests.
-- **Memory** — observed GPU/host usage at steady state.
-- **TTFT and throughput** — measurement method and numbers (not marketing summaries).
-- **Output validation** — how correctness was checked (golden prompts, logprobs, regression suite, etc.).
-
-Secrets (API keys, tokens, private endpoints) must never be committed. Use `env.example` for names only.
+Promotion checklist: [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for manifest fields, path rules, PR procedure, and the full draft-to-verified checklist.
-
-Use the issue templates to request a new recipe or report a bug. Pull requests should complete the checklist in [.github/pull_request_template.md](.github/pull_request_template.md).
+See [CONTRIBUTING.md](CONTRIBUTING.md) for manifest fields, path rules, and the
+draft-to-verified checklist. Use the issue templates for a new recipe or a bug.
+Pull requests should complete [.github/pull_request_template.md](.github/pull_request_template.md).

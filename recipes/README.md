@@ -10,7 +10,8 @@ Inference recipes live under `recipes/<runtime>/<slug>/`. Each recipe is a self-
 | llama.cpp | [llama-cpp/](llama-cpp/) | [llama.cpp](https://github.com/ggml-org/llama.cpp) |
 | vLLM | [vllm/](vllm/) | [vLLM](https://github.com/vllm-project/vllm) |
 
-Lane directories may be empty while the repository is bootstrapped. Use the generator (`make new` or `scripts/new_recipe.py`) to add the first recipe in a lane.
+Populated today: [`llama-cpp/qwen38-flash-next-ud-iq4-xs/`](llama-cpp/qwen38-flash-next-ud-iq4-xs/)
+(`draft`). SGLang and vLLM lanes have guides only.
 
 ## What belongs in a recipe
 
