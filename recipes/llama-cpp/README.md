@@ -143,10 +143,8 @@ Only record numbers you actually ran on Spark; store methodology in the recipe R
 
 | Slug | Intent | Status |
 |------|--------|--------|
-| [`qwen38-flash-next-ud-iq4-xs`](qwen38-flash-next-ud-iq4-xs/) | Unsloth `UD-IQ4_XS` GGUF on 1× GB10; unpatched `run.sh` plus experimental QSA kernel notes | `draft` |
-
-Further slugs (baseline Q4_K_M, quality Q8, OpenAI server variants) remain
-planning targets until someone scaffolds and measures them.
+| [`qwen38-flash-next-ud-iq4-xs`](qwen38-flash-next-ud-iq4-xs/) | **Public default.** Unsloth `UD-IQ4_XS` GGUF, unpatched `run.sh` (~25 tok/s short, 5.60 at 229k) | `draft` |
+| [`qwen38-flash-next-ud-iq4-xs-qsa`](qwen38-flash-next-ud-iq4-xs-qsa/) | Experimental QSA kernel patch + locked hashes. Fail-closed; does not replace the default | `draft` |
 
 ---
 

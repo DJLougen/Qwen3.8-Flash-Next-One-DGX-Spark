@@ -1,9 +1,9 @@
 {
   "$schema": "../../../schema/recipe.schema.json",
   "schema_version": 1,
-  "id": "llama-cpp/qwen38-flash-next-ud-iq4-xs",
-  "title": "Qwen3.8 Flash Next UD-IQ4_XS",
-  "summary": "Unpatched llama.cpp serving recipe for Unsloth UD-IQ4_XS on one DGX Spark. Public default; QSA kernels are a sibling config.",
+  "id": "llama-cpp/qwen38-flash-next-ud-iq4-xs-qsa",
+  "title": "Qwen3.8 Flash Next UD-IQ4_XS QSA kernels",
+  "summary": "Experimental QSA CUDA kernel patch on the same UD-IQ4_XS GGUF. Not the public default.",
   "runtime": "llama-cpp",
   "model": {
     "repository": "unsloth/Qwen3.8-Flash-Next-GGUF",

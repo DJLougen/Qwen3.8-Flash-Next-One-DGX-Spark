@@ -1,12 +1,12 @@
 # Qwen3.8 Flash Next UD-IQ4_XS on DGX Spark
 
-> **Draft, measured on one DGX Spark.** Status stays `draft` because llama.cpp
-> Qwen4Exp is still [PR #27742](https://github.com/ggml-org/llama.cpp/pull/27742)
-> and the experimental QSA kernel patch is not the default `run.sh` path.
+> **Draft, measured on one DGX Spark.** This is the **public default** for the
+> UD-IQ4_XS GGUF: unpatched llama.cpp [PR #27742](https://github.com/ggml-org/llama.cpp/pull/27742)
+> commit `250b61446`. Status stays `draft` because that architecture PR is still
+> open.
 >
-> Default launch is the **unpatched** configuration below. Kernel numbers live
-> in [`results/qsa-kernels.md`](results/qsa-kernels.md) and use a different
-> prompt protocol than the ~25 tok/s short-prompt figure.
+> Overnight QSA kernels are a **second config**, not this `run.sh`:
+> [`../qwen38-flash-next-ud-iq4-xs-qsa/`](../qwen38-flash-next-ud-iq4-xs-qsa/).
 
 ## Scope
 
@@ -104,9 +104,10 @@ See [`results/summary.md`](results/summary.md) for configuration sweeps,
 context-depth results, task-shape data, raw-file provenance, and rejected
 experiments.
 
-Experimental QSA kernels (not `run.sh`): 64k greedy-count **18.73 tok/s** vs
-unpatched **11.35 tok/s** on that protocol; 128k **15.35 tok/s** (PDL) /
-**13.96 tok/s** (`__ldg`). See [`results/qsa-kernels.md`](results/qsa-kernels.md).
+Experimental QSA CUDA kernels are **not** this recipe. They live in
+[`../qwen38-flash-next-ud-iq4-xs-qsa/`](../qwen38-flash-next-ud-iq4-xs-qsa/)
+with locked hashes and the patch. Do not treat 18.73 tok/s as a replacement
+for the ~25 tok/s short-prompt figure above.
 
 NVFP4 / 2×GB10 SGLang numbers from
 [r0b0tlab/Qwen3.8-Flash-Next-NVFP4-W4A16-sm121](https://huggingface.co/r0b0tlab/Qwen3.8-Flash-Next-NVFP4-W4A16-sm121)

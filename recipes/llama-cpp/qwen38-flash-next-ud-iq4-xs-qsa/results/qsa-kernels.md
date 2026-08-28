@@ -1,12 +1,12 @@
 # Experimental QSA kernel track (2026-08-27/28)
 
-> **Not the recipe default.** `run.sh` still launches the unpatched
-> `250b61446` binary. These numbers are from a working tree at
-> `/home/djl/llama.cpp-qwen4exp` with
-> [`../patches/qsa-lightning-working.patch`](../patches/qsa-lightning-working.patch).
+> **Not the public default.** The serving recipe is
+> [`../../qwen38-flash-next-ud-iq4-xs/`](../../qwen38-flash-next-ud-iq4-xs/)
+> (unpatched `250b61446`). These numbers are from `/home/djl/llama.cpp-qwen4exp`
+> with [`../patches/qsa-lightning-working.patch`](../patches/qsa-lightning-working.patch).
 >
 > Do not mix them with the unpatched **~25 tok/s** short-prompt figure in
-> [`summary.md`](summary.md). Prompt, sampler, and thinking flags differ.
+> [`../../qwen38-flash-next-ud-iq4-xs/results/summary.md`](../../qwen38-flash-next-ud-iq4-xs/results/summary.md).
 
 ## Protocol
 
@@ -72,7 +72,7 @@ the kernel result that matters. Prefill of a 64k prompt was ~3.0 ms/token
 Apply on the Qwen4Exp llama.cpp tree, then rebuild `llama-server`:
 
 ```text
-recipes/llama-cpp/qwen38-flash-next-ud-iq4-xs/patches/qsa-lightning-working.patch
+recipes/llama-cpp/qwen38-flash-next-ud-iq4-xs-qsa/patches/qsa-lightning-working.patch
 ```
 
 Ten files, 1140 lines. Do not apply the rejected PLE lazy-advice prototype or

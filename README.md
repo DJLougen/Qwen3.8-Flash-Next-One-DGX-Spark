@@ -11,33 +11,28 @@ measured Spark evidence in those directories.
 
 ## Current catalog
 
-| Recipe | Runtime | Weights | Status | What is measured |
-|--------|---------|---------|--------|------------------|
-| [`recipes/llama-cpp/qwen38-flash-next-ud-iq4-xs/`](recipes/llama-cpp/qwen38-flash-next-ud-iq4-xs/) | llama.cpp Qwen4Exp ([PR #27742](https://github.com/ggml-org/llama.cpp/pull/27742)) | [unsloth/Qwen3.8-Flash-Next-GGUF](https://huggingface.co/unsloth/Qwen3.8-Flash-Next-GGUF) `UD-IQ4_XS` @ `ff34bcdd8a6ecffbe75b392e57b866df8f6bba8f` | **`draft`** | 1× GB10, no speculative decoding |
+| Recipe | Role | Status | Measured |
+|--------|------|--------|----------|
+| [`recipes/llama-cpp/qwen38-flash-next-ud-iq4-xs/`](recipes/llama-cpp/qwen38-flash-next-ud-iq4-xs/) | **Public default** — unpatched llama.cpp [PR #27742](https://github.com/ggml-org/llama.cpp/pull/27742) | **`draft`** | 1× GB10, no speculative decoding |
+| [`recipes/llama-cpp/qwen38-flash-next-ud-iq4-xs-qsa/`](recipes/llama-cpp/qwen38-flash-next-ud-iq4-xs-qsa/) | Experimental QSA CUDA kernels (patch + hashes). `run.sh` fails closed | **`draft`** | Different prompt protocol than the default |
 
-It remains `draft` because the llama.cpp architecture is still an open PR, and
-the experimental QSA kernel patch is not the default `run.sh` path.
+SGLang and vLLM lanes are empty.
 
-Headline **unpatched** numbers on one Spark (see the recipe README for
-methodology):
+Default recipe (unpatched `250b61446`) on one Spark:
 
 - short prompt, cache-off: **~25 tok/s** decode, **0.551 s** TTFT, ctx 4096
 - native **262,144** context allocation succeeded
 - 229,874-token prompt: **5.60 tok/s** decode, **1,218.85 s** TTFT
 - parallel 2 @ ctx 8192: **20.68 tok/s/request**, **32.82** aggregate output tok/s
 
-An experimental QSA kernel patch
-([`qsa-lightning-working.patch`](recipes/llama-cpp/qwen38-flash-next-ud-iq4-xs/patches/qsa-lightning-working.patch))
-raised the 64k greedy-count protocol from **11.35 → 18.73 tok/s** with locked
-output hashes. At 128k the same protocol was **15.35 tok/s** (PDL) and
-**13.96 tok/s** (`__ldg` — slower). Different prompt than the 25 tok/s figure.
-Details: [`results/qsa-kernels.md`](recipes/llama-cpp/qwen38-flash-next-ud-iq4-xs/results/qsa-kernels.md).
+Do **not** replace those figures with the QSA-kernel 64k **18.73 tok/s** path.
+That config is slower or incomparable on the default short prompt; details and
+locked hashes (`2689367b205c16ce`, `8547299278d81f66`) live only in the sibling
+recipe.
 
 Closed llama.cpp [PR #27842](https://github.com/ggml-org/llama.cpp/pull/27842)
-(`draft-mtp`, n-max 3) was ported onto an isolated `250b61446` tree and measured
-on this GGUF with a 3.9 GiB Q8_0 MTP head converted from the local FP8
-checkpoint: **~40.5 tok/s** decode at ctx 4096, **75.6%** draft accept
-(**~1.6×** vs unpatched AR). Not merged upstream; not `run.sh`. Details:
+(`draft-mtp`, n-max 3) was measured on an isolated tree against the **default**
+GGUF (~40.5 tok/s decode, 75.6% accept). Not merged; not `run.sh`. Details:
 [`results/mtp-draft.md`](recipes/llama-cpp/qwen38-flash-next-ud-iq4-xs/results/mtp-draft.md).
 
 ## Not this repository
@@ -53,7 +48,7 @@ Do not paste their NEXTN 2.48× or NVFP4 tok/s onto this GGUF recipe.
 
 | Lane | Path | State |
 |------|------|-------|
-| llama.cpp | [recipes/llama-cpp/](recipes/llama-cpp/) | One draft recipe + experimental QSA patch |
+| llama.cpp | [recipes/llama-cpp/](recipes/llama-cpp/) | Default unpatched recipe + fail-closed QSA kernel config |
 | SGLang | [recipes/sglang/](recipes/sglang/) | Empty; use the generator. Related work is r0b0tlab’s NVFP4 stack, not duplicated here |
 | vLLM | [recipes/vllm/](recipes/vllm/) | Empty; use the generator |
 

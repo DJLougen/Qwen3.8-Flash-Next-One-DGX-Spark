@@ -42,7 +42,7 @@ llama.cpp recipe.
 - **Prompt protocol.** This recipe's 25 tok/s used `tools/stream_benchmark.py`
   against `llama-server`. Overnight QSA kernel work used a different greedy
   “count 1–20” protocol and must not be mixed with 25 tok/s (see
-  [`../recipes/llama-cpp/qwen38-flash-next-ud-iq4-xs/results/qsa-kernels.md`](../recipes/llama-cpp/qwen38-flash-next-ud-iq4-xs/results/qsa-kernels.md)).
+  [`../recipes/llama-cpp/qwen38-flash-next-ud-iq4-xs-qsa/results/qsa-kernels.md`](../recipes/llama-cpp/qwen38-flash-next-ud-iq4-xs-qsa/results/qsa-kernels.md)).
 
 ## Related llama.cpp comparison (not NVFP4)
 

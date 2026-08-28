@@ -11,7 +11,8 @@ Inference recipes live under `recipes/<runtime>/<slug>/`. Each recipe is a self-
 | vLLM | [vllm/](vllm/) | [vLLM](https://github.com/vllm-project/vllm) |
 
 Populated today: [`llama-cpp/qwen38-flash-next-ud-iq4-xs/`](llama-cpp/qwen38-flash-next-ud-iq4-xs/)
-(`draft`). SGLang and vLLM lanes have guides only.
+(public default, `draft`) and [`llama-cpp/qwen38-flash-next-ud-iq4-xs-qsa/`](llama-cpp/qwen38-flash-next-ud-iq4-xs-qsa/)
+(experimental kernels, `draft`). SGLang and vLLM lanes have guides only.
 
 ## What belongs in a recipe
 
