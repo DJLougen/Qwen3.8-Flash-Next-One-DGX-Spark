@@ -33,6 +33,13 @@ output hashes. At 128k the same protocol was **15.35 tok/s** (PDL) and
 **13.96 tok/s** (`__ldg` — slower). Different prompt than the 25 tok/s figure.
 Details: [`results/qsa-kernels.md`](recipes/llama-cpp/qwen38-flash-next-ud-iq4-xs/results/qsa-kernels.md).
 
+Closed llama.cpp [PR #27842](https://github.com/ggml-org/llama.cpp/pull/27842)
+(`draft-mtp`, n-max 3) was ported onto an isolated `250b61446` tree and measured
+on this GGUF with a 3.9 GiB Q8_0 MTP head converted from the local FP8
+checkpoint: **~40.5 tok/s** decode at ctx 4096, **75.6%** draft accept
+(**~1.6×** vs unpatched AR). Not merged upstream; not `run.sh`. Details:
+[`results/mtp-draft.md`](recipes/llama-cpp/qwen38-flash-next-ud-iq4-xs/results/mtp-draft.md).
+
 ## Not this repository
 
 | Project | Relation |

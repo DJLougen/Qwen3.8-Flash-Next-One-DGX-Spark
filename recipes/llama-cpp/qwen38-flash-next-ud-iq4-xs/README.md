@@ -113,6 +113,9 @@ NVFP4 / 2×GB10 SGLang numbers from
 are a different stack. Comparison:
 [`docs/comparison-nvfp4-w4a16-sglang.md`](../../../docs/comparison-nvfp4-w4a16-sglang.md).
 
+Experimental MTP draft (isolated tree, not `run.sh`): ctx 4096 **~40.5 tok/s**
+decode, 75.6% accept, n-max 3. See [`results/mtp-draft.md`](results/mtp-draft.md).
+
 ## Reproduce benchmark inputs
 
 Start the server at the desired context, then generate deterministic prompt
