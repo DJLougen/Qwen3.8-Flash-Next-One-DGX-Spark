@@ -107,3 +107,7 @@ the [0xBakeer graph-reuse port](results/graph-reuse-port.md).
 See [CONTRIBUTING.md](CONTRIBUTING.md) for manifest fields, path rules, and the
 draft-to-verified checklist. Use the issue templates for a new recipe or a bug.
 Pull requests should complete [.github/pull_request_template.md](.github/pull_request_template.md).
+
+## License
+
+This project is licensed under the terms of the custom permissive license with specific exclusions. See [LICENSE](LICENSE) for full legal terms and conditions.
