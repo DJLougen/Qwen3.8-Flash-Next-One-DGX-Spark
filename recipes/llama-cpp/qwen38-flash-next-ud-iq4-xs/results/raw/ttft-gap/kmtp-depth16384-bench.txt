@@ -1,0 +1,2 @@
+run 1/1: ok ttft=40.323s total=42.671s tokens=64 decode_tps=26.832 e2e_tps=1.500
+aggregate: successful=1/1 ttft_median=40.323s decode_tps_median=26.832

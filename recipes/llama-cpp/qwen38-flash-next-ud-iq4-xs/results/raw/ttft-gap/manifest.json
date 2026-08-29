@@ -1,0 +1,10 @@
+[
+  {
+    "bytes": 134771,
+    "path": "/tmp/qwen38-context-prompts/ctx16384.txt",
+    "raw_tokens": 16192,
+    "reserve_tokens": 192,
+    "seed": 380051,
+    "target_context": 16384
+  }
+]

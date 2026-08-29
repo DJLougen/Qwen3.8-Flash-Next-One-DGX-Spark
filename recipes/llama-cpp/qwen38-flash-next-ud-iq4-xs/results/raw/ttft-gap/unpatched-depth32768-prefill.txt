@@ -1,0 +1,1 @@
+3.17.307.700 I slot print_timing: id  0 | task 0 | prompt eval time =   73049.90 ms / 32627 tokens (    2.24 ms per token,   446.64 tokens per second)

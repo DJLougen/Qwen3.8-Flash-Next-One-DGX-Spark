@@ -1,0 +1,150 @@
+15:25:13
+aggregate: successful=1/1 ttft_median=11.728s decode_tps_median=24.090
+=== depth curve: unpatched ===
+aggregate: successful=1/1 ttft_median=11.728s decode_tps_median=24.090
+1
+---
+15:26:43
+aggregate: successful=1/1 ttft_median=11.728s decode_tps_median=24.090
+=== depth curve: unpatched ===
+aggregate: successful=1/1 ttft_median=11.728s decode_tps_median=24.090
+1
+---
+15:28:13
+aggregate: successful=1/1 ttft_median=11.728s decode_tps_median=24.090
+=== depth curve: unpatched ===
+aggregate: successful=1/1 ttft_median=11.728s decode_tps_median=24.090
+2
+---
+15:29:43
+=== depth curve: unpatched ===
+aggregate: successful=1/1 ttft_median=11.728s decode_tps_median=24.090
+aggregate: successful=1/1 ttft_median=37.056s decode_tps_median=23.838
+2
+---
+15:31:13
+=== depth curve: unpatched ===
+aggregate: successful=1/1 ttft_median=11.728s decode_tps_median=24.090
+aggregate: successful=1/1 ttft_median=37.056s decode_tps_median=23.838
+3
+---
+15:32:43
+aggregate: successful=1/1 ttft_median=11.728s decode_tps_median=24.090
+aggregate: successful=1/1 ttft_median=37.056s decode_tps_median=23.838
+aggregate: successful=1/1 ttft_median=73.420s decode_tps_median=21.969
+3
+---
+15:34:13
+aggregate: successful=1/1 ttft_median=11.728s decode_tps_median=24.090
+aggregate: successful=1/1 ttft_median=37.056s decode_tps_median=23.838
+aggregate: successful=1/1 ttft_median=73.420s decode_tps_median=21.969
+4
+---
+15:35:43
+aggregate: successful=1/1 ttft_median=11.728s decode_tps_median=24.090
+aggregate: successful=1/1 ttft_median=37.056s decode_tps_median=23.838
+aggregate: successful=1/1 ttft_median=73.420s decode_tps_median=21.969
+4
+---
+15:37:13
+aggregate: successful=1/1 ttft_median=73.420s decode_tps_median=21.969
+aggregate: successful=1/1 ttft_median=162.461s decode_tps_median=19.989
+=== depth curve: kmtp ===
+4
+---
+15:38:43
+aggregate: successful=1/1 ttft_median=73.420s decode_tps_median=21.969
+aggregate: successful=1/1 ttft_median=162.461s decode_tps_median=19.989
+=== depth curve: kmtp ===
+4
+---
+15:40:13
+aggregate: successful=1/1 ttft_median=73.420s decode_tps_median=21.969
+aggregate: successful=1/1 ttft_median=162.461s decode_tps_median=19.989
+=== depth curve: kmtp ===
+4
+---
+15:41:43
+aggregate: successful=1/1 ttft_median=162.461s decode_tps_median=19.989
+=== depth curve: kmtp ===
+=== depth curve: kmtp (fixed LD) ===
+4
+---
+15:43:14
+aggregate: successful=1/1 ttft_median=162.461s decode_tps_median=19.989
+=== depth curve: kmtp ===
+=== depth curve: kmtp (fixed LD) ===
+4
+---
+15:44:44
+=== depth curve: kmtp ===
+=== depth curve: kmtp (fixed LD) ===
+aggregate: successful=1/1 ttft_median=10.847s decode_tps_median=29.841
+5
+---
+15:46:14
+=== depth curve: kmtp ===
+=== depth curve: kmtp (fixed LD) ===
+aggregate: successful=1/1 ttft_median=10.847s decode_tps_median=29.841
+5
+---
+15:47:44
+=== depth curve: kmtp (fixed LD) ===
+aggregate: successful=1/1 ttft_median=10.847s decode_tps_median=29.841
+aggregate: successful=1/1 ttft_median=40.323s decode_tps_median=26.832
+6
+---
+15:49:14
+=== depth curve: kmtp (fixed LD) ===
+aggregate: successful=1/1 ttft_median=10.847s decode_tps_median=29.841
+aggregate: successful=1/1 ttft_median=40.323s decode_tps_median=26.832
+6
+---
+15:50:44
+=== depth curve: kmtp (fixed LD) ===
+aggregate: successful=1/1 ttft_median=10.847s decode_tps_median=29.841
+aggregate: successful=1/1 ttft_median=40.323s decode_tps_median=26.832
+7
+---
+15:52:14
+aggregate: successful=1/1 ttft_median=10.847s decode_tps_median=29.841
+aggregate: successful=1/1 ttft_median=40.323s decode_tps_median=26.832
+aggregate: successful=1/1 ttft_median=78.676s decode_tps_median=23.988
+7
+---
+15:53:44
+aggregate: successful=1/1 ttft_median=10.847s decode_tps_median=29.841
+aggregate: successful=1/1 ttft_median=40.323s decode_tps_median=26.832
+aggregate: successful=1/1 ttft_median=78.676s decode_tps_median=23.988
+7
+---
+15:55:14
+aggregate: successful=1/1 ttft_median=10.847s decode_tps_median=29.841
+aggregate: successful=1/1 ttft_median=40.323s decode_tps_median=26.832
+aggregate: successful=1/1 ttft_median=78.676s decode_tps_median=23.988
+8
+---
+15:56:44
+aggregate: successful=1/1 ttft_median=10.847s decode_tps_median=29.841
+aggregate: successful=1/1 ttft_median=40.323s decode_tps_median=26.832
+aggregate: successful=1/1 ttft_median=78.676s decode_tps_median=23.988
+8
+---
+15:58:14
+aggregate: successful=1/1 ttft_median=78.676s decode_tps_median=23.988
+aggregate: successful=1/1 ttft_median=167.471s decode_tps_median=8.971
+=== ngram combo (copy-heavy) ===
+8
+---
+15:59:44
+aggregate: successful=1/1 ttft_median=78.676s decode_tps_median=23.988
+aggregate: successful=1/1 ttft_median=167.471s decode_tps_median=8.971
+=== ngram combo (copy-heavy) ===
+8
+---
+16:01:14
+2.51.416.952 I slot print_timing: id  0 | task 39 | draft acceptance = 0.83333 (  115 accepted /   138 generated), mean len = 11.45
+2.53.103.890 I slot print_timing: id  0 | task 54 | draft acceptance = 1.00000 (  125 accepted /   125 generated), mean len = 63.50
+2.56.783.197 I slot print_timing: id  0 | task 59 | draft acceptance = 0.73485 (   97 accepted /   132 generated), mean len =  4.23
+8
+---

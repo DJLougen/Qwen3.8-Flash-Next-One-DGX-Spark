@@ -1,0 +1,7 @@
+warmup 1/1: ok ttft=1.644s total=7.826s tokens=128 decode_tps=20.543 e2e_tps=16.355
+run 1/5: ok ttft=0.313s total=5.335s tokens=128 decode_tps=25.289 e2e_tps=23.991
+run 2/5: ok ttft=0.170s total=5.183s tokens=128 decode_tps=25.332 e2e_tps=24.696
+run 3/5: ok ttft=0.152s total=5.141s tokens=128 decode_tps=25.454 e2e_tps=24.898
+run 4/5: ok ttft=0.152s total=5.138s tokens=128 decode_tps=25.467 e2e_tps=24.911
+run 5/5: ok ttft=0.148s total=5.139s tokens=128 decode_tps=25.445 e2e_tps=24.909
+aggregate: successful=5/5 ttft_median=0.152s decode_tps_median=25.445

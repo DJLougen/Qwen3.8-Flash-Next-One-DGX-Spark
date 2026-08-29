@@ -1,0 +1,24 @@
+=== STEP 2: decode regression ===
+aggregate: successful=5/5 ttft_median=0.150s decode_tps_median=28.302
+aggregate: successful=5/5 ttft_median=0.149s decode_tps_median=28.597
+=== generate ctx16384 if missing ===
+=== depth curve: unpatched ===
+aggregate: successful=1/1 ttft_median=11.728s decode_tps_median=24.090
+=== depth curve: unpatched ===
+aggregate: successful=1/1 ttft_median=11.728s decode_tps_median=24.090
+aggregate: successful=1/1 ttft_median=37.056s decode_tps_median=23.838
+aggregate: successful=1/1 ttft_median=73.420s decode_tps_median=21.969
+aggregate: successful=1/1 ttft_median=162.461s decode_tps_median=19.989
+=== depth curve: kmtp ===
+=== depth curve: kmtp (fixed LD) ===
+aggregate: successful=1/1 ttft_median=10.847s decode_tps_median=29.841
+aggregate: successful=1/1 ttft_median=40.323s decode_tps_median=26.832
+aggregate: successful=1/1 ttft_median=78.676s decode_tps_median=23.988
+aggregate: successful=1/1 ttft_median=167.471s decode_tps_median=8.971
+=== ngram combo (copy-heavy) ===
+aggregate: successful=3/3 ttft_median=1.113s decode_tps_median=79.864
+2.48.765.294 I slot print_timing: id  0 | task 0 | draft acceptance = 0.67153 (   92 accepted /   137 generated), mean len =  3.63
+2.51.416.952 I slot print_timing: id  0 | task 39 | draft acceptance = 0.83333 (  115 accepted /   138 generated), mean len = 11.45
+2.53.103.890 I slot print_timing: id  0 | task 54 | draft acceptance = 1.00000 (  125 accepted /   125 generated), mean len = 63.50
+2.56.783.197 I slot print_timing: id  0 | task 59 | draft acceptance = 0.73485 (   97 accepted /   132 generated), mean len =  4.23
+DONE
