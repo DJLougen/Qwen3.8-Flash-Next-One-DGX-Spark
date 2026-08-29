@@ -278,6 +278,26 @@ pulled ~14× more pages and slowed TTFT further. The single-run `NORMAL` decode
 bump is inside noise and disappears against the earlier unpatched RANDOM
 baseline (24.13 tok/s cold / 26.19 tok/s steady). Keep `POSIX_MADV_RANDOM`.
 Do not ship the env override.
+### Multithreaded PLE `GET_ROWS` for prefill (2026-08-29)
+
+During prompt evaluation (`n_tokens > 1`), computing PLE row indices and gathering 16 head rows per token on a single thread incurs significant CPU serialization latency. A patch (`patches/ple-multithreaded-set-input.patch`) parallelizes the per-token PLE n-gram mixing across 12 worker threads (`std::thread` pool) during prefill ubatches while keeping single-token decode strictly single-threaded without synchronization overhead.
+
+Acceptance gates and verification on GB10 under `spark_guard.py` (80/36/28 GiB):
+
+1. **Exact Output Hash:** Greedy temperature-0 short prompt (`prompts/short.txt`, 76 tokens, max 128 tokens) preserved the exact reference SHA-256 hash `cb7904d8097240a2bc32c77e27c03a924fcb972212566d14487d20d2aa687601`.
+2. **Cold 4k TTFT Improvement:** At `-b 2048 -ub 512`, cold 4k TTFT dropped from **12.65 s to 11.68 s** (**7.7% TTFT reduction** / 0.97 s faster), lifting server prefill throughput from **318.1 to 344.2 tok/s** (+8.2%). At `-ub 1024`, TTFT reached **10.785 s**.
+3. **Cold 64k TTFT:** At 64k depth, TTFT was **167.54 s** (391.55 tok/s server prefill, 19.40 tok/s decode). At 64k, disk/memory faults across 26.8 GiB DRAM dominate over index computation.
+4. **Memory Guard:** All guard runs passed with minimum `MemAvailable` > 44.2 GiB.
+
+| Configuration | Prompt tokens | TTFT | Server Prefill tok/s | Decode tok/s | Output SHA-256 |
+|---|---:|---:|---:|---:|---|
+| Short (76 tok) | 76 | 1.361 s | 60.42 | 26.12 | `cb7904d8...` (match) |
+| Cold 4k (`-ub 512`) | 3,955 | **11.680 s** | **344.22** | 24.52 | `c64973d8...` |
+| Cold 4k (`-ub 1024`) | 3,955 | **10.785 s** | **374.11** | 25.62 | `c64973d8...` |
+| Cold 64k (`-ub 512`) | 65,395 | 167.539 s | 391.55 | 19.40 | `52733803...` |
+
+Evidence: `raw/ple-mt/`, patch in `patches/ple-multithreaded-set-input.patch`.
+
 
 Remaining untested directions, in the same safety order: fix whole-file
 `posix_fadvise(..., POSIX_FADV_SEQUENTIAL)` on lazy GGUF files; thresholded
@@ -346,6 +366,8 @@ The comparison repository is MIT licensed, Copyright (c) 2026 0xBakeer. Its meth
 - `raw/ubatch-sweep/`: microbatch sweep (`-ub 256` vs `-ub 1024`) — `-ub 1024` achieved 481.3 tok/s prefill and 8.22 s 4k TTFT (35% TTFT reduction)
 - `raw/deep-ub1024/`: deep-context `-ub 1024` sweep (64k and 128k cold depth benchmarks, all guard logs passing with min available >42 GiB)
 - `raw/ple-baseline-profile.json`: unpatched RANDOM PLE fault/residency profile
+- `raw/ple-mt/`: multithreaded PLE `GET_ROWS` verification — short hash check (`cb7904d8`), cold 4k TTFT scaling (11.68 s at ub512, 10.78 s at ub1024), and cold 64k benchmark
+- `patches/ple-multithreaded-set-input.patch`: patch parallelizing PLE n-gram index computation in `llm_graph_input_ple::set_input` across worker threads
 - `raw/ple-advice-random.jsonl`: unpatched RANDOM cold+steady timings
 - `raw/ple-advice-ab.json`: isolated mmap-advice A/B decision record
 - `raw/ple-advice-prototype-random.jsonl`: patched RANDOM arm
