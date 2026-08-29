@@ -1,0 +1,83 @@
+{
+  "concurrency": 8,
+  "successful_requests": 8,
+  "batch_wall_sec": 15.36027291798382,
+  "total_output_tokens": 1024,
+  "aggregate_tps": 66.66548214785298,
+  "ttft_median_sec": 3.0340272534958785,
+  "decode_median_tps": 10.391345033804697,
+  "results": [
+    {
+      "worker_id": 0,
+      "success": true,
+      "ttft_sec": 1.7687003279861528,
+      "generation_tps": 9.572789173276876,
+      "total_sec": 15.139933902974008,
+      "output_tokens": 128,
+      "output_chars": 0
+    },
+    {
+      "worker_id": 1,
+      "success": true,
+      "ttft_sec": 2.569119193998631,
+      "generation_tps": 10.08398947030286,
+      "total_sec": 15.262508093001088,
+      "output_tokens": 128,
+      "output_chars": 0
+    },
+    {
+      "worker_id": 2,
+      "success": true,
+      "ttft_sec": 3.0323790319962427,
+      "generation_tps": 10.391164516465652,
+      "total_sec": 15.350536423997255,
+      "output_tokens": 128,
+      "output_chars": 0
+    },
+    {
+      "worker_id": 3,
+      "success": true,
+      "ttft_sec": 3.0395070409867913,
+      "generation_tps": 10.395852217903379,
+      "total_sec": 15.352109925006516,
+      "output_tokens": 128,
+      "output_chars": 0
+    },
+    {
+      "worker_id": 4,
+      "success": true,
+      "ttft_sec": 2.570099411008414,
+      "generation_tps": 10.085549486897474,
+      "total_sec": 15.261524917004863,
+      "output_tokens": 128,
+      "output_chars": 0
+    },
+    {
+      "worker_id": 5,
+      "success": true,
+      "ttft_sec": 3.0360604689922184,
+      "generation_tps": 10.393252026516196,
+      "total_sec": 15.351743728999281,
+      "output_tokens": 128,
+      "output_chars": 0
+    },
+    {
+      "worker_id": 6,
+      "success": true,
+      "ttft_sec": 3.037193358002696,
+      "generation_tps": 10.394448896734216,
+      "total_sec": 15.35145852700225,
+      "output_tokens": 128,
+      "output_chars": 0
+    },
+    {
+      "worker_id": 7,
+      "success": true,
+      "ttft_sec": 3.0356754749955144,
+      "generation_tps": 10.39152555114374,
+      "total_sec": 15.353404894995037,
+      "output_tokens": 128,
+      "output_chars": 0
+    }
+  ]
+}

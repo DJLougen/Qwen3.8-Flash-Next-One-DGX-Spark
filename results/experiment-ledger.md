@@ -18,6 +18,7 @@ Authoritative reference of tested, rejected, parked, and untested exploration ax
 | **Parallel-2 concurrency (`--parallel 2 -c 8192`)** | **20.68 tok/s/req** (**32.82 tok/s** aggregate), 0.853 s TTFT | Continuous batching fills GB10 SM capacity while staying within the 36 GiB memory guard (28.15 GiB headroom). | **Proven up to 2 concurrent streams**. |
 | **Parallel-4 concurrency (`--parallel 4 -c 16384`)** | **13.60 tok/s/req** (**44.85 tok/s** aggregate), 1.945 s TTFT | 4-way continuous batching lifts aggregate throughput to ~45 tok/s with 47.5 GiB available memory and 0 memory violations. | **Proven safe up to 4 concurrent streams** (16k total context). |
 | **Deep-context chunked prefill (`-b 2048 -ub 1024`)** | **163.53 s** 64k TTFT (19.96 tok/s); **386.77 s** 128k TTFT (**339.5 tok/s prefill**, **28.1% TTFT reduction** vs 538 s baseline) | Larger microbatch sustains high prefill throughput (339–481 tok/s) at extreme context without memory violations (min available >42 GiB). Flat at 64k where PLE IO dominates. | **Verified at 64k/128k**; documented in `summary.md` (`raw/deep-ub1024/`). |
+| **Parallel-8 concurrency (`--parallel 8 -c 32768`)** | **10.39 tok/s/req** (**66.67 tok/s** aggregate), 3.034 s TTFT | 8-way continuous batching lifts aggregate throughput to ~66.7 tok/s with 45.39 GiB available memory and 0 memory violations. | **Proven safe up to 8 concurrent streams** (32k total context). |
 
 ---
 
@@ -51,4 +52,3 @@ Authoritative reference of tested, rejected, parked, and untested exploration ax
 | **PLE & I/O** | **Zero-Copy Host PLE over NVLink-C2C** | Write a CUDA kernel that directly dereferences the host-mapped PLE table over GB10 ATS hardware coherency instead of CPU staging. | **High** (Major long-context prefill TTFT accelerator) |
 | **PLE & I/O** | **Multithreaded `GET_ROWS` for Prefill** | Parallelize CPU `GET_ROWS` and `IQ4_NL` dequantization across 12 OpenMP threads during initial prompt evaluation. | **High** (Closes the 4k prefill gap between locked 318 and 381 tok/s) |
 | **PLE & I/O** | **Page-Sorted Row Index Gathering** | Sort row indices before gathering to access memory monotonically and minimize translation lookaside buffer (TLB) thrashing. | **Medium** (CPU algorithmic optimization in `llama-kv-cache`) |
-| **Concurrency** | **Very High Concurrency Probe (`np=8`)** | Measure continuous batching throughput and per-slot decode latency scaling up to 8 streams with $c=32\text{k}$. | **Medium** (Requires strict watchdog memory monitoring) |

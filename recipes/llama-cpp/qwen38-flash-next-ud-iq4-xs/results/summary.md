@@ -218,6 +218,22 @@ All four slots launched and processed concurrently without assertions, server
 errors, or guard warnings. Aggregate decode throughput scales to **~45 tok/s**
 (vs 32.8 tok/s at `np=2` and ~29 tok/s single-stream). Evidence: `raw/concurrency-np4/`.
 
+## Parallel-eight concurrency probe (2026-08-29)
+
+Configuration: `--parallel 8` (`-np 8`), total context 32,768 (~4,096 tokens per slot), `-b 2048 -ub 512`, eight synchronized fixed prompts, 128 output tokens each, speculation off, under `spark_guard.py` (80/36/28 GiB).
+
+| Metric | 8-way Aggregate |
+|---|---:|
+| Batch wall-clock | **15.36 s** |
+| Successful requests | **8 / 8** |
+| Aggregate decode throughput | **66.67 tok/s** |
+| Per-slot median decode | **10.39 tok/s** |
+| Per-slot median TTFT | **3.034 s** |
+| Minimum `MemAvailable` | **45.39 GiB** (well above 36 GiB floor) |
+| Maximum swap used | **0.67 GiB** (under 1.0 GiB limit) |
+
+All eight slots launched and processed concurrently without assertions, server errors, or guard warnings. Aggregate decode throughput scales to **~66.7 tok/s** (vs 44.85 tok/s at `np=4`, 32.82 tok/s at `np=2`, and ~29 tok/s single-stream) with per-slot decode remaining at **~10.4 tok/s**. Evidence: `raw/concurrency-np8/`.
+
 ## PLE lookup research
 
 The “51B n-gram” path is a learned **per-layer token embedding** table, not
@@ -326,6 +342,7 @@ The comparison repository is MIT licensed, Copyright (c) 2026 0xBakeer. Its meth
 - `raw/concurrency-np2-ctx8192.jsonl`: three parallel-two request batches
 - `raw/concurrency-np2-ctx8192-guard-summary.json`: memory, swap, stop, and kernel-fault evidence
 - `raw/concurrency-np4/`: 4-way parallel-four continuous batching probe (`-np 4 -c 16384`) — 44.85 tok/s aggregate, 13.60 tok/s/req, 0 memory violations
+- `raw/concurrency-np8/`: 8-way parallel-eight continuous batching probe (`-np 8 -c 32768`) — 66.67 tok/s aggregate, 10.39 tok/s/req, 0 memory violations
 - `raw/ubatch-sweep/`: microbatch sweep (`-ub 256` vs `-ub 1024`) — `-ub 1024` achieved 481.3 tok/s prefill and 8.22 s 4k TTFT (35% TTFT reduction)
 - `raw/deep-ub1024/`: deep-context `-ub 1024` sweep (64k and 128k cold depth benchmarks, all guard logs passing with min available >42 GiB)
 - `raw/ple-baseline-profile.json`: unpatched RANDOM PLE fault/residency profile
