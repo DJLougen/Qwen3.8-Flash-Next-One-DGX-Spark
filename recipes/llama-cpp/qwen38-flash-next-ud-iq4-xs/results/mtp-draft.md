@@ -61,9 +61,7 @@ day (**370** tok/s) exceeded the unpatched verification rerun (**318** tok/s).
 parity. 64k prefill is within ~3% but the client decode row is unreliable (see
 footnote).
 
-\*The 65k client run emitted only **11** completion tokens before the stream ended
-(`stream_benchmark.py` aggregate); treat **167 s TTFT** and **~392 tok/s prefill**
-as the reliable 64k-row signals, not the decode figure.
+\*The 11-token stop is server-side and batch-sensitive — same binary/draft/prompt at `-b 512 -ub 128` (09:57 run, `/tmp/kmtp-qsa64.jsonl` on Spark) produced 64 tokens at 33.3% accept; at `-b 2048 -ub 512` accept collapses to 3.7% and the target output diverges. Treat **167 s TTFT** and **~392 tok/s prefill** as the reliable 64k-row signals, not the decode figure.
 
 ### `draft-mtp` + `ngram-mod` on copy-heavy task (labeled separately)
 
@@ -206,6 +204,7 @@ remeasured).
 - Do not mix with `ngram-mod` copy-learning numbers.
 - The upstream llama.cpp MTP PR remains closed/unmerged; this track is local-only
   on `llama.cpp-qwen4exp-kmtp`.
+- Do not run kmtp at 64k with `-ub 512` until the hybrid-memory ubatch interaction is fixed.
 
 ## Parked post-gap work (not implemented)
 
