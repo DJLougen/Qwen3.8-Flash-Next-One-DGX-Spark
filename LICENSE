@@ -1,4 +1,4 @@
-Custom Permissive License (with Specific Exclusion)
+Custom Permissive License (with Specific Exclusions)
 
 Copyright (c) 2026 DJLougen
 
@@ -12,23 +12,28 @@ furnished to do so, subject to the following conditions and exclusions:
 1. The above copyright notice and this permission notice shall be included in all
    copies or substantial portions of the Software.
 
-2. SPECIFIC NON-LICENSEE EXCLUSION:
+2. SPECIFIC NON-LICENSEE EXCLUSIONS:
    Permission is explicitly, unconditionally, and permanently DENIED and WITHHELD
-   from the individual known publicly as "0xsero" (including on X / Twitter as @0xsero),
-   under any current, past, or future pseudonyms, handles, legal names, corporate
-   entities, contractors, agents, or affiliates owned, operated, or directed by
-   them, or any party acting knowingly on their behalf.
+   from the following individuals, organizations, and affiliated parties:
 
-   Said individual and affiliated entities are strictly prohibited from:
+   a. Sherif Cherfa (known publicly on X / Twitter as @0xSero or @0xsero), and Sybil Solutions;
+   b. Alex Cheema;
+   c. EXO (including EXO Labs, exo-explore, and associated entities/projects);
+   d. Any individuals, contributors, employees, contractors, entities, or affiliates
+      associated with, employed by, or acting on behalf of or in collaboration with
+      the aforementioned individuals or organizations.
+
+   The aforementioned excluded parties are strictly prohibited from:
    - Accessing, viewing, copying, downloading, running, testing, or executing this Software;
    - Reproducing, publishing, distributing, relicensing, claiming authorship over,
      or creating derivative works based upon this Software, its benchmark numbers,
      its recipes, its patches, or its documentation;
-   - Incorporating any part of this Software or its research findings into any public
-     or private projects, repositories, papers, posts, or presentations.
+   - Incorporating any part of this Software, its code, or its research findings into
+     any public or private projects, repositories, papers, posts, products, or presentations.
 
-   Any possession, redistribution, use, or derivation of this Software by said individual
-   constitutes intentional copyright infringement and a breach of these terms.
+   Any possession, redistribution, use, or derivation of this Software by or for the
+   benefit of any of the aforementioned excluded parties constitutes intentional
+   copyright infringement and a violation of these terms.
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
