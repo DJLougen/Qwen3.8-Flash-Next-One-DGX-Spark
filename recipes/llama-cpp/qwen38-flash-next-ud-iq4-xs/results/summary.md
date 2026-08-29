@@ -77,6 +77,18 @@ server after load).
 | `-ub 1024` | **28.74 tok/s** | 0.152 s | **8.22 s** | **481.3 tok/s** | **25.18 tok/s** |
 
 `-ub 1024` yields a **35% reduction in cold 4k TTFT** (8.22 s vs 12.65 s) by lifting prompt prefill from ~318 to **~481 tok/s** on GB10, while keeping short decode at **~28.7 tok/s**. Evidence: `raw/ubatch-sweep/`.
+
+### Deep-context microbatch scaling (`-ub 1024` at 64k / 128k)
+
+Measured 2026-08-29 on fresh unpatched servers per depth with per-depth context allocation (`-c $((CTX + 256))`), `max_tokens=64`, prompt family `ctx*.txt` (seed `380051`).
+
+| Target ctx | Prompt tokens | `-ub 512` TTFT | `-ub 512` prefill tok/s | `-ub 1024` TTFT | `-ub 1024` prefill tok/s | `-ub 1024` decode tok/s | TTFT Delta | Prefill Delta |
+|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| 4,096 | 3,955 | 12.65 s | 318.1 tok/s | **8.22 s** | **481.3 tok/s** | 25.18 tok/s | **-35.0%** | **+51.3%** |
+| 65,536 | 65,395 | 162.46 s | 404.18 tok/s | **163.53 s** | **~400 tok/s** | 19.96 tok/s | +0.7% | -1.0% |
+| 131,072 | 130,931 | 538.32 s* | ~243 tok/s* | **386.77 s** | **339.47 tok/s** | 16.32 tok/s | **-28.1%** | **+39.7%** |
+
+\*128k comparison point from the 2026-08-27 `b512`/`ub128` baseline sweep (538.32 s TTFT / 8.16 tok/s decode). At 64k, TTFT is essentially flat (+0.7%) as PLE memory/IO bottlenecks dominate over chunk launch batching. At 128k, `-ub 1024` cuts TTFT by 151.6 s (**28.1% reduction**) and lifts prefill from ~243 to **339.5 tok/s**. Evidence: `raw/deep-ub1024/`.
 ## Context allocation sweep with a short prompt
 
 These rows measure the cost of allocating a larger context while processing the same 76-token prompt. They do **not** represent decode at that depth.
@@ -315,6 +327,7 @@ The comparison repository is MIT licensed, Copyright (c) 2026 0xBakeer. Its meth
 - `raw/concurrency-np2-ctx8192-guard-summary.json`: memory, swap, stop, and kernel-fault evidence
 - `raw/concurrency-np4/`: 4-way parallel-four continuous batching probe (`-np 4 -c 16384`) — 44.85 tok/s aggregate, 13.60 tok/s/req, 0 memory violations
 - `raw/ubatch-sweep/`: microbatch sweep (`-ub 256` vs `-ub 1024`) — `-ub 1024` achieved 481.3 tok/s prefill and 8.22 s 4k TTFT (35% TTFT reduction)
+- `raw/deep-ub1024/`: deep-context `-ub 1024` sweep (64k and 128k cold depth benchmarks, all guard logs passing with min available >42 GiB)
 - `raw/ple-baseline-profile.json`: unpatched RANDOM PLE fault/residency profile
 - `raw/ple-advice-random.jsonl`: unpatched RANDOM cold+steady timings
 - `raw/ple-advice-ab.json`: isolated mmap-advice A/B decision record
