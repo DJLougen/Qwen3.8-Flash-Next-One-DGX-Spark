@@ -61,11 +61,21 @@ Tried and **reverted** (hash-safe but not faster, or slower):
 | 65,536 | **18.73** | `8547299278d81f66` | best 64k so far; graphs reused 304 |
 | 131,072 | **15.35** | `8547299278d81f66` | PDL configuration (no `__ldg` on K/Q) |
 | 131,072 | 13.96 | `8547299278d81f66` | `__ldg` K/Q; **slower than PDL at 128k**; graphs reused 563; prefill 3.75 ms/token |
+| 229,859 | **11.55** | — (depth protocol) | stream_benchmark depth prompt, output not hash-locked; graphs reused **958**; TTFT 1,198.88 s; prefill 5.21 ms/token; 38.21 GiB min available |
 
 Keep `__ldg` for the 64k win. At 128k, PDL without those loads was faster on
 this protocol. The 64k patched **18.73 tok/s** vs unpatched **11.35 tok/s** is
 the kernel result that matters. Prefill of a 64k prompt was ~3.0 ms/token
 (~330 tok/s), similar before and after the lightning load change.
+
+The 229,859-token row reused the default recipe's `stream_benchmark.py` depth
+protocol (temperature 0, chat template) so it is directly comparable to the
+unpatched **5.60 tok/s** depth-sweep baseline, not to the greedy-count hash
+protocol used at 64k/128k above. Decode nearly doubles (**5.60 → 11.55 tok/s**,
+~2.06×) while TTFT is effectively flat (**1,218.85 → 1,198.88 s**): the fused
+mean / lightning changes accelerate per-token decode, not the long prefill.
+Prefill ran at 5.21 ms/token (191.96 tok/s) vs 5.30 ms/token (188.85 tok/s)
+unpatched. Memory floor was 38.21 GiB available, 0.64 GiB swap.
 
 ## Patch
 

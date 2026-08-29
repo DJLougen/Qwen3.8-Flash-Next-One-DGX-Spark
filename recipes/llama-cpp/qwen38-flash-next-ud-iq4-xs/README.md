@@ -93,8 +93,9 @@ but it is not the default and must never be reported as general model speed.
 
 The selected short-prompt configuration reached:
 
-- steady prompt-cache-disabled TTFT: **0.551 seconds**
-- steady decode: **approximately 25 tok/s**
+- **Short prompt only** (`prompts/short.txt`, 76 tokens, `b2048`/`ub512`, post-warmup): **~0.15 s** TTFT, **~29 tok/s** decode (2026-08-29 regression)
+- **Varied task-shape prompts** (`b512`/`ub128`, 2026-08-27): still **~24 tok/s** — not remeasured at `b2048`/`ub512` (see `results/summary.md`)
+- cold 4k-target depth (~3,955 tokens, verification rerun): **12.65 s TTFT**, **~318 tok/s prefill** (below plan bar ≥380; TTFT ~flat vs 12.38 s at `b512`)
 - native 262,144-token allocation: successful
 - 229,874-token prompt: **1,218.85-second TTFT**, **5.60 tok/s decode**
 - minimum available memory in the full-depth run: **39.53 GiB**
@@ -104,18 +105,28 @@ See [`results/summary.md`](results/summary.md) for configuration sweeps,
 context-depth results, task-shape data, raw-file provenance, and rejected
 experiments.
 
-Experimental QSA CUDA kernels are **not** this recipe. They live in
+Experimental QSA CUDA kernels are documented in the sibling recipe
 [`../qwen38-flash-next-ud-iq4-xs-qsa/`](../qwen38-flash-next-ud-iq4-xs-qsa/)
-with locked hashes and the patch. Do not treat 18.73 tok/s as a replacement
-for the ~25 tok/s short-prompt figure above.
+(patch, locked hashes, separate prompt protocol).
 
-NVFP4 / 2×GB10 SGLang numbers from
-[r0b0tlab/Qwen3.8-Flash-Next-NVFP4-W4A16-sm121](https://huggingface.co/r0b0tlab/Qwen3.8-Flash-Next-NVFP4-W4A16-sm121)
-are a different stack. Comparison:
-[`docs/comparison-nvfp4-w4a16-sglang.md`](../../../docs/comparison-nvfp4-w4a16-sglang.md).
+NVFP4 on 2× GB10 (SGLang) is documented separately; see
+[`results/nvfp4-sglang-comparison.md`](../../../results/nvfp4-sglang-comparison.md).
 
 Experimental MTP draft (isolated tree, not `run.sh`): ctx 4096 **~40.5 tok/s**
 decode, 75.6% accept, n-max 3. See [`results/mtp-draft.md`](results/mtp-draft.md).
+
+## Parked post-gap work (not in `run.sh`)
+
+From the 2026-08-29 TTFT-gap plan; **documented only**, not implemented:
+
+1. **Zero-copy PLE gather** — GPU reads host-resident PLE rows over NVLink-C2C
+   ATS instead of per-row mmap faults on the 16 CPU gathers per token; long
+   prefill remains bound (229k **~5.3 ms/token**; QSA decode **~2×** with TTFT
+   **~flat**). See [`results/summary.md`](results/summary.md).
+2. **MTP draft-layer follow-on** — beyond QSA-wired `graph_mtp` (accept unchanged
+   at 4k/64k); see [`results/mtp-draft.md`](results/mtp-draft.md).
+
+Details: [`results/summary.md`](results/summary.md) § Parked post-gap work.
 
 ## Reproduce benchmark inputs
 

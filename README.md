@@ -9,47 +9,40 @@ Lanes exist for **SGLang**, **llama.cpp**, and **vLLM**. Only llama.cpp has a
 populated recipe today. SGLang and vLLM stay fail-closed until someone lands
 measured Spark evidence in those directories.
 
+## Results
+
+Measured on one NVIDIA DGX Spark (GB10). Reproduce via each recipe's `run.sh`
+and `results/`.
+
+| Configuration | Prompt | Decode | TTFT |
+|---|---|---:|---:|
+| Default unpatched `250b61446` | 76-token short, cache off (`b2048`/`ub512`) | **~29 tok/s** | 0.15 s |
+| Default unpatched `250b61446` | 4k-target depth, cold (`b2048`/`ub512`) | **~25 tok/s** | 12.65 s |
+| Default unpatched | 229,874 depth | **5.60 tok/s** | 1,218.85 s |
+| Default unpatched, 2 parallel | 8,192 each | **20.68 tok/s/req** (32.82 agg.) | 0.853 s |
+| QSA kernels (sibling, fail-closed) | 65,536 greedy-count | **18.73 tok/s** | — |
+| QSA kernels (sibling, fail-closed) | 229,859 depth | **11.55 tok/s** | 1,198.88 s |
+| draft-mtp n-max 3 (isolated tree) | 4,096 | **~40.5 tok/s** (75.6% accept) | — |
+| draft-mtp on QSA kernels (combined tree) | 229,859 depth | 10.2 tok/s (43% accept) — slower than kernel AR | 1,242.96 s |
+
+Rows that differ in binary or benchmark protocol are labeled; see each recipe's
+`results/` before ranking figures across rows.
+
 ## Current catalog
 
 | Recipe | Role | Status | Measured |
 |--------|------|--------|----------|
 | [`recipes/llama-cpp/qwen38-flash-next-ud-iq4-xs/`](recipes/llama-cpp/qwen38-flash-next-ud-iq4-xs/) | **Public default** — unpatched llama.cpp [PR #27742](https://github.com/ggml-org/llama.cpp/pull/27742) | **`draft`** | 1× GB10, no speculative decoding |
-| [`recipes/llama-cpp/qwen38-flash-next-ud-iq4-xs-qsa/`](recipes/llama-cpp/qwen38-flash-next-ud-iq4-xs-qsa/) | Experimental QSA CUDA kernels (patch + hashes). `run.sh` fails closed | **`draft`** | Different prompt protocol than the default |
+| [`recipes/llama-cpp/qwen38-flash-next-ud-iq4-xs-qsa/`](recipes/llama-cpp/qwen38-flash-next-ud-iq4-xs-qsa/) | Experimental QSA CUDA kernels (patch + hashes). `run.sh` fails closed | **`draft`** | Separate prompt protocol from the default |
 
 SGLang and vLLM lanes are empty.
-
-Default recipe (unpatched `250b61446`) on one Spark:
-
-- short prompt, cache-off: **~25 tok/s** decode, **0.551 s** TTFT, ctx 4096
-- native **262,144** context allocation succeeded
-- 229,874-token prompt: **5.60 tok/s** decode, **1,218.85 s** TTFT
-- parallel 2 @ ctx 8192: **20.68 tok/s/request**, **32.82** aggregate output tok/s
-
-Do **not** replace those figures with the QSA-kernel 64k **18.73 tok/s** path.
-That config is slower or incomparable on the default short prompt; details and
-locked hashes (`2689367b205c16ce`, `8547299278d81f66`) live only in the sibling
-recipe.
-
-Closed llama.cpp [PR #27842](https://github.com/ggml-org/llama.cpp/pull/27842)
-(`draft-mtp`, n-max 3) was measured on an isolated tree against the **default**
-GGUF (~40.5 tok/s decode, 75.6% accept). Not merged; not `run.sh`. Details:
-[`results/mtp-draft.md`](recipes/llama-cpp/qwen38-flash-next-ud-iq4-xs/results/mtp-draft.md).
-
-## Not this repository
-
-| Project | Relation |
-|---------|----------|
-| [r0b0tlab/Qwen3.8-Flash-Next-NVFP4-W4A16-sm121](https://huggingface.co/r0b0tlab/Qwen3.8-Flash-Next-NVFP4-W4A16-sm121) + [companion SGLang repo](https://github.com/r0b0tlab/qwen38-flash-next-w4a16-sm121-sglang) | 2× GB10, ModelOpt NVFP4 W4A16, SGLang MTP NEXTN. Different quant, GPU count, and decoder. Comparison notes: [`docs/comparison-nvfp4-w4a16-sglang.md`](docs/comparison-nvfp4-w4a16-sglang.md) |
-| [0xBakeer/qwen38-flash-next-spark](https://github.com/0xBakeer/qwen38-flash-next-spark) | llama.cpp methodology reference. Graph-reuse port **segfaulted** here and is not shipped |
-
-Do not paste their NEXTN 2.48× or NVFP4 tok/s onto this GGUF recipe.
 
 ## Runtime lanes
 
 | Lane | Path | State |
 |------|------|-------|
 | llama.cpp | [recipes/llama-cpp/](recipes/llama-cpp/) | Default unpatched recipe + fail-closed QSA kernel config |
-| SGLang | [recipes/sglang/](recipes/sglang/) | Empty; use the generator. Related work is r0b0tlab’s NVFP4 stack, not duplicated here |
+| SGLang | [recipes/sglang/](recipes/sglang/) | Empty; use the generator |
 | vLLM | [recipes/vllm/](recipes/vllm/) | Empty; use the generator |
 
 Runtime IDs: [`config/runtimes.json`](config/runtimes.json). Catalog rules:
@@ -102,6 +95,12 @@ Inference is **not** launched in CI.
 | `deprecated` | Superseded or unsafe; kept for history |
 
 Promotion checklist: [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## External results and references
+
+Third-party stacks and port attempts we compared against or tested live in
+[`results/`](results/): [NVFP4 SGLang](results/nvfp4-sglang-comparison.md) and
+the [0xBakeer graph-reuse port](results/graph-reuse-port.md).
 
 ## Contributing
 

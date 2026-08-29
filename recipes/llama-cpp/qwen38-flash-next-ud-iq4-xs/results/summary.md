@@ -24,8 +24,8 @@ load-mode=mmap
 tensor-read-lazy=on
 all normal layers on CUDA
 threads=12
-batch=512
-ubatch=128
+batch=2048
+ubatch=512
 flash attention=on
 KV=f16
 parallel=1
@@ -58,8 +58,25 @@ Prompt cache was disabled. Values are medians of five measured requests after on
 | all GPU, t12, b4096, ub64 | 0.687 s | 22.726 | larger logical batch hurt decode |
 | all GPU, t12, b512, ub64 | 0.691 s | **25.114** | best decode median |
 | all GPU, t20, b512, ub64 | 0.695 s | 24.831 | extra CPU threads hurt |
-| all GPU, t12, b512, ub128 | **0.551 s** | 24.942 | selected; ~20% lower TTFT |
+| all GPU, t12, b512, ub128 | **0.551 s** | 24.942 | former default; ~20% lower TTFT than b512/ub64 |
 
+## Batch-size default change and microbatch sweep (2026-08-29)
+
+`run.sh` now defaults to `-b 2048 -ub 512`. On the 76-token short prompt (one warmup,
+five measured runs, unpatched tree), median steady-state decode was **28.597 tok/s**
+versus **28.302 tok/s** at the previous `-b 512 -ub 128` default (within 10%; decode
+regression check passed). Median TTFT on those measured runs was **0.149 s** (warm
+server after load).
+
+### Microbatch scaling comparison (`-b 2048`)
+
+| Microbatch (`-ub`) | Short decode (76 tok) | Short warm TTFT | Cold 4k TTFT (3,913 tok) | 4k prefill tok/s | 4k decode tok/s |
+|---|---:|---:|---:|---:|---:|
+| `-ub 256` | 25.45 tok/s | 0.152 s | 12.47 s | 316.8 tok/s | 22.77 tok/s |
+| `-ub 512` (default) | 28.60 tok/s | 0.149 s | 12.65 s | 318.1 tok/s | 25.01 tok/s |
+| `-ub 1024` | **28.74 tok/s** | 0.152 s | **8.22 s** | **481.3 tok/s** | **25.18 tok/s** |
+
+`-ub 1024` yields a **35% reduction in cold 4k TTFT** (8.22 s vs 12.65 s) by lifting prompt prefill from ~318 to **~481 tok/s** on GB10, while keeping short decode at **~28.7 tok/s**. Evidence: `raw/ubatch-sweep/`.
 ## Context allocation sweep with a short prompt
 
 These rows measure the cost of allocating a larger context while processing the same 76-token prompt. They do **not** represent decode at that depth.
@@ -75,25 +92,43 @@ These rows measure the cost of allocating a larger context while processing the 
 
 The 65K dip was not monotonic and should not be treated as a context-scaling curve.
 
-## Actual prompt-depth sweep
+## Cold depth curve (`b2048` / `ub512`, 2026-08-29)
 
-Deterministic prompts were generated with seed `380051` and measured through the server tokenizer. Each row is one cold, prompt-cache-disabled request with 64 output tokens. See `tools/generate_context_prompts.py` and `raw/depth-sweep-f16.jsonl`.
+Deterministic prompts from `/tmp/qwen38-context-prompts/ctx{4096,16384,32768,65536}.txt`
+(seed `380051`). **One fresh unpatched server per depth**, one cold request each,
+`max_tokens=64`, `warmup-count=0`, `repetitions=1`. Client metrics from
+`stream_benchmark.py`; prefill tok/s from server `prompt eval time` on that cold
+request.
 
-| Prompt tokens | TTFT / prompt completion | Decode tok/s |
-|---:|---:|---:|
-| 898 | 2.91 s | 21.05 |
-| 3,970 | 12.38 s | 22.69 |
-| 16,258 | 41.92 s | 20.73 |
-| 32,642 | 86.85 s | 17.62 |
-| 65,409 | 193.09 s | 11.35 |
-| 130,946 | 538.32 s | 8.16 |
-| 229,874 | 1,218.85 s | **5.60** |
+| Target ctx | Prompt tokens | TTFT | Prefill tok/s (server) | Decode tok/s (client) |
+|---:|---:|---:|---:|---:|
+| 4,096 | 3,955 | 12.65 s | 318.13 | 25.01 |
+| 16,384 | 16,243 | 37.06 s | 442.51 | 23.84 |
+| 32,768 | 32,627 | 73.42 s | 446.64 | 21.97 |
+| 65,536 | 65,395 | 162.46 s | 404.18 | 19.99 |
 
-For the 229,874-token row, llama-server reported 188.85 prompt tok/s and 5.60 generation tok/s. This is the honest long-context curve; short-prompt decode near 25 tok/s is not sustained at deep context.
+**4k verification rerun (2026-08-29):** fresh
+`llama-server.unpatched-250b61446`, same cold protocol; the locked row is this
+rerun (**318.13 tok/s** server prefill, **12.65 s** TTFT, **~3.2 ms/token**
+wall-clock). An earlier same-day pass reported **343.8 tok/s** / **11.73 s**
+TTFT. Both sit **below** the plan bar (≥380 tok/s prefill; session case G on
+the same binary was **~381 tok/s** at 4k, `/tmp/prefill-G-server.log`).
+**TTFT did not materially improve** vs the 2026-08-27 `b512`/`ub128` cold depth
+point (**12.38 s** at ~3,970 tokens, **~3.2 ms/token** wall-clock). The
+`b2048`/`ub512` default change was validated on the **76-token** short
+regression (decode + warm TTFT); it did not materially move cold 4k wall-clock
+TTFT. Short-prompt decode near **29 tok/s** (`b2048`/`ub512`, 76-token prompt)
+is not sustained here (**~25 tok/s** in the locked 4k row).
 
-## Varied task-shape baseline, speculation off
+### Earlier full-depth sweep (`b512` / `ub128`, 2026-08-27)
 
-The literal `@` in each prompt is replaced with a different deterministic identifier for every run. This prevents repeated-request output learning from masquerading as speed. Values are medians of three measured requests after one warmup.
+See `raw/depth-sweep-f16.jsonl` for the original token-ladder through 229,874
+tokens. The 229,874-token row remains **5.60 tok/s** decode and **1,218.85 s**
+TTFT; that long tail is unchanged by the batch default.
+
+## Varied task-shape baseline, speculation off (`b512` / `ub128`, 2026-08-27)
+
+The literal `@` in each prompt is replaced with a different deterministic identifier for every run. This prevents repeated-request output learning from masquerading as speed. Values are medians of three measured requests after one warmup. **Not remeasured** after the `b2048`/`ub512` default change.
 
 | Task | Prompt tokens | TTFT | Decode tok/s |
 |---|---:|---:|---:|
@@ -102,7 +137,13 @@ The literal `@` in each prompt is replaced with a different deterministic identi
 | Add a new function | 257 | 1.081 s | 24.285 |
 | Original technical prose | 130 | 0.674 s | 23.639 |
 
-This supports an honest general-purpose headline of approximately **24–25 tok/s**, not the copy-only speculative headline from another repository.
+**Do not blend with current defaults:** these rows are **`b512`/`ub128`,
+2026-08-27 only** — still **~24 tok/s** decode on varied tasks. The
+**2026-08-29** `b2048`/`ub512` change was measured on the **76-token**
+`prompts/short.txt` regression only (**~29 tok/s** decode, **0.15 s** warm
+TTFT); task-shape prompts were **not remeasured**. Copy-heavy `draft-mtp` +
+`ngram-mod` on reproduce-module reached **~80 tok/s** decode (three varied
+runs, 2026-08-29); label separately in [`results/mtp-draft.md`](mtp-draft.md).
 
 ## Parallel-two concurrency probe
 
@@ -143,8 +184,27 @@ kills. Memory evidence:
 A separate non-streaming verification client stalled locally and did not reach
 the server; it is excluded. The synchronized streaming probe and server logs
 are the accepted evidence. Concurrency 2 is therefore proven for this bounded
-4K-per-slot case. Higher concurrency remains untested.
+4K-per-slot case.
 
+## Parallel-four concurrency probe (2026-08-29)
+
+Configuration: `--parallel 4`, total context 16,384 (~4,096 tokens per slot),
+four synchronized fixed prompts, 128 output tokens each, speculation off,
+under `spark_guard.py` (80/36/28 GiB).
+
+| Metric | 4-way Aggregate |
+|---|---:|
+| Batch wall-clock | **11.42 s** |
+| Successful requests | **4 / 4** |
+| Aggregate decode throughput | **44.85 tok/s** |
+| Per-slot median decode | **13.60 tok/s** |
+| Per-slot median TTFT | **1.945 s** |
+| Minimum `MemAvailable` | **47.5 GiB** (well above 36 GiB floor) |
+| Maximum swap used | **0.65 GiB** (under 1.0 GiB limit) |
+
+All four slots launched and processed concurrently without assertions, server
+errors, or guard warnings. Aggregate decode throughput scales to **~45 tok/s**
+(vs 32.8 tok/s at `np=2` and ~29 tok/s single-stream). Evidence: `raw/concurrency-np4/`.
 
 ## PLE lookup research
 
@@ -196,6 +256,25 @@ Remaining untested directions, in the same safety order: fix whole-file
 multithreaded `GET_ROWS` for large prefill gathers; page-sorted/deduplicated
 row gathers. Explicit I/O, hot-row caches, and layout/quant redesign stay last.
 
+## Parked post-gap work (not implemented)
+
+Documented from the 2026-08-29 TTFT-gap plan; **not shipped** in this recipe:
+
+1. **Zero-copy PLE gather** — GPU reads host-resident PLE rows over NVLink-C2C
+   ATS instead of per-row mmap faults on the 16 CPU `ggml_get_rows` path per
+   token. Motivation: long prefill stays PLE-bound — 229,874-token depth
+   **~5.3 ms/token** wall-clock (1,218.85 s TTFT); QSA kernels roughly **double**
+   decode at that depth (5.60 → 11.55 tok/s) with **TTFT effectively flat**
+   (1,218.85 → 1,198.88 s). Target: closer honest prefill without abandoning
+   lazy CPU PLE.
+2. **MTP draft-layer changes** — further draft-graph / indexer work beyond the
+   QSA-wired `graph_mtp` verification in [`mtp-draft.md`](mtp-draft.md)
+   (accept unchanged at 4k/64k). Parked after measured identical accept.
+
+Closing the remaining 4k prefill gap (locked **318** vs case G **~381**) and
+long-context prefill likely needs (1) or a separate serving lane (e.g.
+vLLM-class prefill), not batch-size tuning alone.
+
 ## Invalid and rejected experiments
 
 ### Repeated-prompt `ngram-mod`
@@ -227,12 +306,15 @@ The comparison repository is MIT licensed, Copyright (c) 2026 0xBakeer. Its meth
 - `raw/ctx1024-nocache-v1.jsonl`: honest short-prompt baseline
 - `raw/ctx1024-opt*.jsonl`: runtime tuning sweep
 - `raw/ctx*.jsonl`: context-allocation sweep
-- `raw/depth-sweep-f16.jsonl`: actual prompt-depth sweep
+- `raw/depth-sweep-f16.jsonl`: actual prompt-depth sweep (`b512`/`ub128`, 2026-08-27)
+- `raw/ttft-gap/`: full 2026-08-29 TTFT-gap sequence — decode `b512` vs `b2048` regression, unpatched + kmtp (QSA-wired `draft-mtp`) depth curves 4k–64k, `ngram` copy-heavy combo, and the 4k cold verification rerun (`rerun-unpatched-4k/`); runner: `tools/ttft_gap_benchmark.sh`, all 12 guard logs passing
 - `raw/tasks-varied-spec-off.jsonl`: task-shape baseline with per-run prompt variation
 - `raw/tasks-ngram-mod.jsonl`: contaminated repeated-prompt pilot; excluded
 
 - `raw/concurrency-np2-ctx8192.jsonl`: three parallel-two request batches
 - `raw/concurrency-np2-ctx8192-guard-summary.json`: memory, swap, stop, and kernel-fault evidence
+- `raw/concurrency-np4/`: 4-way parallel-four continuous batching probe (`-np 4 -c 16384`) — 44.85 tok/s aggregate, 13.60 tok/s/req, 0 memory violations
+- `raw/ubatch-sweep/`: microbatch sweep (`-ub 256` vs `-ub 1024`) — `-ub 1024` achieved 481.3 tok/s prefill and 8.22 s 4k TTFT (35% TTFT reduction)
 - `raw/ple-baseline-profile.json`: unpatched RANDOM PLE fault/residency profile
 - `raw/ple-advice-random.jsonl`: unpatched RANDOM cold+steady timings
 - `raw/ple-advice-ab.json`: isolated mmap-advice A/B decision record
