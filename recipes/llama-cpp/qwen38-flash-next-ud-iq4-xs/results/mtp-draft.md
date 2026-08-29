@@ -196,6 +196,20 @@ an accept lever. **Further accept chasing is parked** — the curve stays
 content/cut-point dominated (32k baseline 63.1% unchanged; QSA-wired 32k not
 remeasured).
 
+## Entropy-gated MTP draft length (`--spec-draft-p-min`, 2026-08-29)
+
+The kmtp tree supports `--spec-draft-p-min` (default `0.0`; `common/speculative.cpp:798`), which halts draft token generation when candidate top-1 probability $p < p_{\min}$.
+
+Measured on `ctx4096.txt` (deterministic words, seed 380051), `temperature=0`, `max_tokens=64`, `n-max=3`, under `spark_guard.py` (80/36/28 GiB):
+
+| Config (`--spec-draft-p-min`) | Output Tokens | TTFT | Decode tok/s (client) | Server Eval Time | Draft Accept (server) | Finding |
+|---|---:|---:|---:|---:|---:|---|
+| `0.0` (baseline, ungated) | 64 | 13.04 s | **28.38 tok/s** | 30.62 ms/tok | **66.67% (42/63)** | Full $N=3$ draft chains generated; steady MTP speedup. |
+| `0.6` (moderate gate) | 3* | 11.55 s | 13.45 tok/s | 71.40 ms/tok | — | Gate halts drafting immediately on high-entropy text ($p < 0.60$). |
+| `0.9` (strict gate) | 3* | 12.07 s | 12.54 tok/s | 75.18 ms/tok | — | Gate halts drafting on nearly every token ($p < 0.90$). |
+
+\*On arbitrary/high-entropy text, top-1 token probability is frequently $<0.60$. With $p_{\min} \ge 0.60$, the gate correctly suppresses low-confidence draft tokens, but in the current kmtp hybrid-memory implementation, early draft termination exposes non-consecutive position warnings and halts generation early. `--spec-draft-p-min 0.0` remains the required setting for `draft-mtp`. Evidence: `raw/mtp-pmin/`.
+
 ## Do not
 
 - Do not use `--spec-draft-n-max 8` (PR: slower than AR; rollback-slot cost).
