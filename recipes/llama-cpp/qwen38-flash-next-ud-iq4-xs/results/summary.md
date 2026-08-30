@@ -436,6 +436,7 @@ The comparison repository is MIT licensed, Copyright (c) 2026 0xBakeer. Its meth
 - `patches/qwen4exp-can-reuse.patch`: can_reuse overrides for llm_graph_input_qsa/llm_graph_input_ple with per-batch mctx refresh (also carries the restored PLE-MT content)
 - `raw/rmsnorm-fusion/`: fused zero-centered RMSNorm investigation — axis closed as not indicated: (1+w) already converter-folded, GEMM alpha structurally scalar, existing {RMS_NORM,MUL} fuser covers legal sites, qwen4exp sites fail fusion gates structurally, prize ~0.5-1% decode
 - `raw/deep-prefill-levers/`: deep-context prefill sizing — prefill-stable graph variant capped ~12-20% at 4k decaying to ~0-2% at 64k (PLE-IO-bound); decode graph-reuse win measured at 64k (71.88 vs 73.27 ms/tok, ~1.9%); zero-copy ATS microbenchmark named as the deep-lane next gate
+- `raw/ats-microbench/`: zero-copy host PLE first gate — ATS sustained 8.11 GB/s (1 GiB) / 6.36 GB/s (8 GiB cache-defeated) at 90-byte random granularity, failing the ≥20 GB/s plan gate; reframe: PLE demand ~1.4 MB/s/ubatch is 4,500x under the measured floor, so deep prefill is not interconnect-bound (sources + analysis)
 Raw JSONL in this directory is the unpatched recipe evidence. Kernel-track
 timings are the sibling config
 [`../../qwen38-flash-next-ud-iq4-xs-qsa/results/qsa-kernels.md`](../../qwen38-flash-next-ud-iq4-xs-qsa/results/qsa-kernels.md).
