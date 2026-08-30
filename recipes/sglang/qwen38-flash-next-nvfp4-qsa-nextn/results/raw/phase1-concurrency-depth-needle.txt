@@ -1,0 +1,29 @@
+==========================================================================
+CONCURRENCY SWEEP -- aggregate vs per-stream, TTFT p50/p95, success rate
+==========================================================================
+n=1: agg   26.3 tok/s | per-stream  29.3 | TTFT p50   0.79s p95   0.79s | ok 1/1 | accept 3.04 | free 17.27 GB
+n=2: agg   35.7 tok/s | per-stream  22.3 | TTFT p50   1.37s p95   1.48s | ok 2/2 | accept 2.57 | free 17.27 GB
+n=4: agg   55.8 tok/s | per-stream  17.2 | TTFT p50   2.62s p95   2.63s | ok 4/4 | accept 2.56 | free 17.27 GB
+n=8: agg   54.4 tok/s | per-stream  13.8 | TTFT p50   3.21s p95   18.3s | ok 8/8 | accept 2.54 | free 17.27 GB
+
+[saved phase 'concurrency' -> <workdir>/results.json]
+==========================================================================
+TTFT vs DEPTH -- cold prefill, unique prefix per run (no cache reuse)
+==========================================================================
+   7806 tok | TTFT    3.73s ( 2094 tok/s) | decode  29.5 | accept 2.38 | free 17.27 GB
+  31702 tok | TTFT   15.01s ( 2112 tok/s) | decode  27.4 | accept 3.02 | free 17.27 GB
+  63892 tok | TTFT   30.88s ( 2069 tok/s) | decode  28.7 | accept 2.7 | free None GB
+ 127895 tok | TTFT   64.97s ( 1968 tok/s) | decode  25.9 | accept 2.73 | free None GB
+ 199931 tok | TTFT  137.42s ( 1455 tok/s) | decode  22.9 | accept 2.88 | free None GB
+
+[saved phase 'depth' -> <workdir>/results.json]
+==========================================================================
+NEEDLE RETRIEVAL
+==========================================================================
+depth   0.1% |  106435 tok | found=True | '7734-ZULU-19'
+depth  40.0% |  106436 tok | found=True | '7734-ZULU-19'
+depth  90.0% |  106436 tok | found=True | '7734-ZULU-19'
+
+needle: 3/3
+
+[saved phase 'needle' -> <workdir>/results.json]
