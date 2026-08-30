@@ -1,0 +1,10 @@
+{
+  "label": "mtp_t00_backend_on",
+  "temperature": 0.0,
+  "success": true,
+  "ttft_sec": 11.873051557020517,
+  "generation_tps": 33.16877444060171,
+  "total_sec": 13.802577174996259,
+  "output_tokens": 64,
+  "output_chars": 0
+}

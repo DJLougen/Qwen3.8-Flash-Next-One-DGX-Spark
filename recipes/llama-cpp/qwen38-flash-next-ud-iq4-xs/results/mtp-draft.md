@@ -210,6 +210,18 @@ Measured on `ctx4096.txt` (deterministic words, seed 380051), `temperature=0`, `
 
 \*On arbitrary/high-entropy text, top-1 token probability is frequently $<0.60$. With $p_{\min} \ge 0.60$, the gate correctly suppresses low-confidence draft tokens, but in the current kmtp hybrid-memory implementation, early draft termination exposes non-consecutive position warnings and halts generation early. `--spec-draft-p-min 0.0` remains the required setting for `draft-mtp`. Evidence: `raw/mtp-pmin/`.
 
+## MTP draft sampling & temperature interaction (2026-08-29)
+
+Tested on `ctx4096.txt` (deterministic words, seed 380051), `max_tokens=64`, `n-max=3`, under `spark_guard.py` (80/36/28 GiB):
+
+| Target Request | Draft Sampler Mode | TTFT | Decode tok/s (client) | Server Eval Time | Draft Accept (server) | Finding |
+|---|---|---:|---:|---:|---:|---|
+| Greedy ($T=0.0$) | Backend sampling (`--spec-draft-backend-sampling`) | 11.87 s | **33.17 tok/s** | 30.55 ms/tok | **66.67% (42/63)** | Greedy baseline; accurate draft alignment. |
+| Stochastic ($T=0.7$) | Backend sampling (`--spec-draft-backend-sampling`) | 11.56 s | **19.88 tok/s** | 51.04 ms/tok | **32.29% (31/96)** | GPU sampler chain mismatch drops accept by >50%. |
+| Stochastic ($T=0.7$) | CPU sampler (`--no-spec-draft-backend-sampling`) | 12.45 s | **34.84 tok/s** | 29.10 ms/tok | **72.88% (43/59)** | CPU sampler aligns with target sampling; +75% speedup vs backend sampling. |
+
+**Key Finding:** When serving stochastic requests ($T > 0$), GPU backend draft sampling causes severe rejection penalties (acceptance drops to 32.3%). Disabling backend draft sampling with `--no-spec-draft-backend-sampling` restores high acceptance (72.9%) and lifts decode throughput to **34.84 tok/s** (+75% speedup). Evidence: `raw/mtp-sampler/`.
+
 ## Do not
 
 - Do not use `--spec-draft-n-max 8` (PR: slower than AR; rollback-slot cost).
