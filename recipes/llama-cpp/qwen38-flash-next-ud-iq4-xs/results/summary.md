@@ -332,6 +332,21 @@ every ubatch) vs `graphs reused = 7` on unpatched `250b61446` (prompt eval
 the gap total (shuffled same-length prompt on a warm server: 8.636 s vs
 9.969 s cold). New prioritized axis: QSA-native CUDA-graph-reuse fix.
 Evidence: `raw/nsys-4k/`.
+
+### QSA graph-reuse fix — `can_reuse` overrides (2026-08-30)
+
+Added `can_reuse` shape-stability overrides to `llm_graph_input_qsa` and
+`llm_graph_input_ple` (they inherited the unconditional-false base default, so
+every ubatch on this arch rebuilt the compute graph: `graphs reused = 0`). The
+overrides also refresh the per-batch `mctx` before reuse — without it the first
+reused step dereferences a destroyed batch's memory context (GDB-captured SIGSEGV;
+this and the missing shape checks explain the earlier hard-rejected 0xBakeer
+patch's crash). Verified: short hash `cb7904d8` exact; repeat identical request
+survives (0xBakeer scenario) at 28.5 tok/s; `graphs reused = 127` per 128-token
+decode; **decode ~38.4-41.5 ms/tok vs 43.4-45.2 control (~10-12% faster)**; 4k
+output byte-identical to the no-override control. Prefill unchanged by design
+(padded n_kv growth correctly forces rebuild each ubatch). Evidence:
+`raw/graph-reuse/`, patch `patches/qwen4exp-can-reuse.patch`.
 ## Parked post-gap work (not implemented)
 
 Documented from the 2026-08-29 TTFT-gap plan; **not shipped** in this recipe:
@@ -417,6 +432,8 @@ The comparison repository is MIT licensed, Copyright (c) 2026 0xBakeer. Its meth
 - `raw/ple-advice-prototype-sequential.jsonl`: patched SEQUENTIAL arm
 - `patches/ple-lazy-advice.patch`: rejected env-selector prototype
 - `raw/nsys-4k/`: nsys cold 4k prefill decision experiment — session kernel/memops reports, request benchmark, guard log, and window analysis (GPU 38.5% busy, ~6.6 s CPU-side gaps, graphs-reuse breakage identified); neither fused-gated-residual nor zero-copy-PLE indicated
+- `raw/graph-reuse/`: QSA graph-reuse fix verification — can_reuse overrides, GDB crash backtrace of the dangling-mctx bug, final gate logs (short hash match, repeat-request survival, 127 reuses/128-tok decode, ~12% decode speedup), no-override 4k control hash
+- `patches/qwen4exp-can-reuse.patch`: can_reuse overrides for llm_graph_input_qsa/llm_graph_input_ple with per-batch mctx refresh (also carries the restored PLE-MT content)
 Raw JSONL in this directory is the unpatched recipe evidence. Kernel-track
 timings are the sibling config
 [`../../qwen38-flash-next-ud-iq4-xs-qsa/results/qsa-kernels.md`](../../qwen38-flash-next-ud-iq4-xs-qsa/results/qsa-kernels.md).

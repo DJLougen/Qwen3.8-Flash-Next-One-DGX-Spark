@@ -1,5 +1,5 @@
 diff --git a/src/models/qwen4exp.cpp b/src/models/qwen4exp.cpp
-index c2ab9900e..031ed6915 100644
+index c2ab9900e..5fa1d75b5 100644
 --- a/src/models/qwen4exp.cpp
 +++ b/src/models/qwen4exp.cpp
 @@ -1,3 +1,4 @@
@@ -7,7 +7,48 @@ index c2ab9900e..031ed6915 100644
  #include "models.h"
  #include "llama-impl.h"
  #include "llama-memory-hybrid-idx.h"
-@@ -937,6 +938,7 @@ void llm_graph_input_ple::set_input(const llama_ubatch * ubatch) {
+@@ -397,6 +398,26 @@ public:
+         mctx->get_idx()->set_input_k_idxs(k_idxs, ubatch);
+         mctx->set_input_qsa(cell_blk, blk_cells, blk_pos, bias, ubatch, ratio, blk_bias);
+     }
++    // reuse when all input tensors would be recreated with identical shapes
++    // (decode steps inside one n_kv pad bucket; a bucket crossing rebuilds, like the dense path)
++    bool can_reuse(const llm_graph_params & params) override {
++        // refresh the per-batch memory context: the stored one belongs to a destroyed batch
++        mctx = static_cast<const llama_memory_hybrid_idx_context *>(params.mctx);
++        const auto * mctx_hyb = mctx;
++        const llama_kv_cache_context * mctx_idx = mctx_hyb->get_idx();
++        const auto & ubatch = params.ubatch;
++        const int64_t n_kv     = mctx_idx->get_n_kv();
++        const int64_t n_stream = mctx_hyb->get_n_stream();
++        const int64_t n_blocks = (n_kv + ratio - 1)/ratio;
++        const int64_t n_tps    = ubatch.n_tokens/n_stream;
++        bool res = true;
++        res &= k_idxs->ne[0]    == ubatch.n_tokens;
++        res &= cell_blk->ne[0]  == n_kv && cell_blk->ne[1]  == n_stream;
++        res &= blk_cells->ne[0] == (int64_t) ratio*n_blocks && blk_cells->ne[1] == n_stream;
++        res &= blk_pos->ne[0]   == 4*n_blocks*n_stream;
++        res &= bias->ne[0]      == (blk_bias ? n_blocks : n_kv) && bias->ne[1] == n_tps && bias->ne[2] == n_stream;
++        return res;
++    }
+ 
+     // per stream: a cell index names a different token in each stream
+     ggml_tensor * k_idxs    = nullptr;   // I32 [n_tokens]
+@@ -903,6 +924,13 @@ public:
+ 
+     void set_input(const llama_ubatch * ubatch) override;
+ 
++    // rows is [ple_n_heads * n_tokens]; identical ubatch geometry means identical shapes
++    bool can_reuse(const llm_graph_params & params) override {
++        // refresh the per-batch cache context before any reuse (mirrors attn_kv::can_reuse)
++        mctx = static_cast<const llama_memory_hybrid_idx_context *>(params.mctx)->get_attn();
++        return rows->ne[0] == (int64_t) pmodel.hparams.ple_n_heads * params.ubatch.n_tokens;
++    }
++
+     ggml_tensor * rows = nullptr;   // I32 [ple_n_heads * n_tokens]
+ 
+     const llama_model_qwen4exp & pmodel;
+@@ -937,6 +965,7 @@ void llm_graph_input_ple::set_input(const llama_ubatch * ubatch) {
      std::vector<int32_t> idx(n_heads * n_tokens);
  
      GGML_ASSERT(mctx != nullptr);
@@ -15,7 +56,7 @@ index c2ab9900e..031ed6915 100644
  
      for (int64_t i = 0; i < n_tokens; ++i) {
          // the preceding tokens would be ambiguous, see get_prev_tokens()
-@@ -946,31 +948,65 @@ void llm_graph_input_ple::set_input(const llama_ubatch * ubatch) {
+@@ -946,31 +975,65 @@ void llm_graph_input_ple::set_input(const llama_ubatch * ubatch) {
      // predecessors come from the KV cells (ext.tok); apply_ubatch() already stored this ubatch, so its own tokens count too
      mctx->get_prev_tokens(*ubatch, n_prev, prev);
  
