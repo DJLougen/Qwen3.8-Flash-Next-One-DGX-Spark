@@ -50,5 +50,5 @@ Authoritative reference of tested, rejected, parked, and untested exploration ax
 |---|---|---|---|
 | **Layer Surgery** | **Fused Zero-Centered RMSNorm** | Fuse $(1 + w)$ weight offset directly into GEMM input scaling; eliminates 1 separate kernel launch per transformer block. | **High** (CUDA / GGML kernel edit) |
 | **Layer Surgery** | **Fused Gated Residual + Projection** | Fuse $\text{output} = x + \text{gate} \odot \text{proj}(\text{act})$ into a single elementwise kernel pass. | **Medium** (Kernel fusion in `ggml-cuda`) |
-| **MTP Knobs** | **Tree / Multi-Branch Speculation** | Evaluate a small 2-branch tree draft ($1 \to 2$) verified in a single masked attention pass vs linear chains. | **Medium** (Requires engine support in `llama-graph`) |
 | **PLE & I/O** | **Zero-Copy Host PLE over NVLink-C2C** | Write a CUDA kernel that directly dereferences the host-mapped PLE table over GB10 ATS hardware coherency instead of CPU staging. | **High** (Major long-context prefill TTFT accelerator) |
+| **MTP Knobs** | **Tree / Multi-Branch Speculation** | Evaluate a small 2-branch tree draft ($1 \to 2$) verified in a single masked attention pass vs linear chains. | **Medium** (Requires engine support in `llama-graph`) |
