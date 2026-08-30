@@ -40,6 +40,7 @@ Authoritative reference of tested, rejected, parked, and untested exploration ax
 | **Whole-table PLE prewarming in VRAM (~27 GiB)** | Exceeds 36 GiB available memory threshold | Deprives 262k KV cache of essential allocation headroom. | **Rejected for general serving.** |
 | **Entropy-Gated Draft Length (`--spec-draft-p-min >= 0.60`)** | Halts drafting on arbitrary text ($p < 0.60$); emits only 3 tokens vs 64 at $p_{\min}=0.0$ (**28.38 tok/s**, 66.7% accept) | Natural text has low top-1 probability ($p < 0.60$), causing the gate to suppress drafting on nearly all steps. | **Keep `--spec-draft-p-min 0.0`** (disabled) for general serving. |
 | **Page-Sorted Row Index Gathering (`ggml-cpu/ops.cpp`)** | Cold 4k TTFT regressed (**12.04 s vs 11.68 s** on PLE-MT tree); 64k regressed (**168.5 s vs 167.5 s**) | Per-thread `O(K \log K)` index sorting adds CPU overhead without overcoming Linux page-fault latency floors. | **Rejected and reverted.** Do not sort row indices in ggml-cpu. |
+| **Layer Redundancy / Cosine Pruning (Layers 12–36)** | Peak inter-layer cosine similarity is only **0.6582** (mean **0.645–0.656** across linear/full attention & shared MLP); far below $\ge 0.90$ redundancy threshold | Hybrid architecture (3× linear + 1× full attention) with hyper-connections maintains distinct, specialized state updates across all 48 layers. | **Hard-rejected.** Do not prune or bypass middle transformer blocks. |
 
 ---
 
@@ -49,6 +50,5 @@ Authoritative reference of tested, rejected, parked, and untested exploration ax
 |---|---|---|---|
 | **Layer Surgery** | **Fused Zero-Centered RMSNorm** | Fuse $(1 + w)$ weight offset directly into GEMM input scaling; eliminates 1 separate kernel launch per transformer block. | **High** (CUDA / GGML kernel edit) |
 | **Layer Surgery** | **Fused Gated Residual + Projection** | Fuse $\text{output} = x + \text{gate} \odot \text{proj}(\text{act})$ into a single elementwise kernel pass. | **Medium** (Kernel fusion in `ggml-cuda`) |
-| **Layer Surgery** | **Layer Redundancy / Cosine Pruning** | Measure inter-layer cosine similarity across middle blocks (layers 12–36); test whether freezing or bypassing 2–4 redundant blocks retains reasoning. | **Medium** (Structural ablation probe) |
 | **MTP Knobs** | **Tree / Multi-Branch Speculation** | Evaluate a small 2-branch tree draft ($1 \to 2$) verified in a single masked attention pass vs linear chains. | **Medium** (Requires engine support in `llama-graph`) |
 | **PLE & I/O** | **Zero-Copy Host PLE over NVLink-C2C** | Write a CUDA kernel that directly dereferences the host-mapped PLE table over GB10 ATS hardware coherency instead of CPU staging. | **High** (Major long-context prefill TTFT accelerator) |

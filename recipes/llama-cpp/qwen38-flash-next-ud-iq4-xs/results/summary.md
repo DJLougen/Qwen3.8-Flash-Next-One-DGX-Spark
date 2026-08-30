@@ -348,6 +348,18 @@ A current-head adaptation of the MIT patch from `0xBakeer/qwen38-flash-next-spar
 
 The Spark later rebooted without a clean shutdown. The previous boot contained multiple NVIDIA OOM events from several workloads, including one temporally associated with the graph-reuse experiment. Causality cannot be assigned solely to this recipe, but no additional model loads should be run until the host is treated as recovered and the unsafe patch remains excluded.
 
+
+### Layer redundancy and cosine similarity probe — rejected (2026-08-29)
+
+A structural probe measured inter-layer weight cosine similarities across all 48 layers of Qwen3.8-Flash-Next (including linear attention QKV, full attention Q/K, and shared MLP gates) to test whether middle blocks (layers 12–36) exhibit high redundancy ($\ge 0.90$) suitable for layer bypassing or pruning.
+
+Findings:
+- Linear attention QKV inter-layer similarity: Mean = **0.6455**, Max = **0.6514**, Min = **0.6424**
+- Full attention QKV inter-layer similarity: Mean = **0.6559**, Max = **0.6572**, Min = **0.6541**
+- Shared MLP gate/down inter-layer similarity: Mean = **0.6489 / 0.6556**, Max = **0.6549 / 0.6582**
+- Peak observed inter-layer cosine similarity in middle blocks: **0.6582** (far below the $\ge 0.90$ redundancy threshold).
+
+Unlike uniform dense transformers, Qwen3.8-Flash-Next's hybrid architecture (`3× linear + 1× full attention`) with hyper-connection mixing maintains highly orthogonal, specialized layer representations throughout the network. **Layer pruning / block bypassing is rejected.** Evidence: `raw/layer-similarity/`.
 ## Comparison-repository lessons
 
 Research clone: `0xBakeer/qwen38-flash-next-spark` commit `4c6fc3af429bff5c472511cf965751eac6b7caf2`.
@@ -383,6 +395,7 @@ The comparison repository is MIT licensed, Copyright (c) 2026 0xBakeer. Its meth
 - `raw/ple-pagesort/`: page-sorted PLE row gathering verification — short hash check (`cb7904d8`), cold 4k TTFT scaling (12.04 s), and cold 64k benchmark
 - `raw/ple-advice-ab.json`: isolated mmap-advice A/B decision record
 - `raw/ple-advice-prototype-random.jsonl`: patched RANDOM arm
+- `raw/layer-similarity/`: inter-layer cosine similarity probe across all 48 layers of Qwen3.8-Flash-Next (peak similarity 0.6582 confirms absence of layer redundancy)
 - `raw/ple-advice-prototype-normal.jsonl`: patched NORMAL arm
 - `raw/ple-advice-prototype-sequential.jsonl`: patched SEQUENTIAL arm
 - `patches/ple-lazy-advice.patch`: rejected env-selector prototype
