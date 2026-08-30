@@ -434,6 +434,7 @@ The comparison repository is MIT licensed, Copyright (c) 2026 0xBakeer. Its meth
 - `raw/nsys-4k/`: nsys cold 4k prefill decision experiment — session kernel/memops reports, request benchmark, guard log, and window analysis (GPU 38.5% busy, ~6.6 s CPU-side gaps, graphs-reuse breakage identified); neither fused-gated-residual nor zero-copy-PLE indicated
 - `raw/graph-reuse/`: QSA graph-reuse fix verification — can_reuse overrides, GDB crash backtrace of the dangling-mctx bug, final gate logs (short hash match, repeat-request survival, 127 reuses/128-tok decode, ~12% decode speedup), no-override 4k control hash
 - `patches/qwen4exp-can-reuse.patch`: can_reuse overrides for llm_graph_input_qsa/llm_graph_input_ple with per-batch mctx refresh (also carries the restored PLE-MT content)
+- `raw/rmsnorm-fusion/`: fused zero-centered RMSNorm investigation — axis closed as not indicated: (1+w) already converter-folded, GEMM alpha structurally scalar, existing {RMS_NORM,MUL} fuser covers legal sites, qwen4exp sites fail fusion gates structurally, prize ~0.5-1% decode
 Raw JSONL in this directory is the unpatched recipe evidence. Kernel-track
 timings are the sibling config
 [`../../qwen38-flash-next-ud-iq4-xs-qsa/results/qsa-kernels.md`](../../qwen38-flash-next-ud-iq4-xs-qsa/results/qsa-kernels.md).
