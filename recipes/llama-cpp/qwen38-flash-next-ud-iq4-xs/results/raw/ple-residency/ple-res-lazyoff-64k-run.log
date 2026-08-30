@@ -1,0 +1,28 @@
+[20:27:31] === arm lazyoff-64k ctx=65536 ub=512 lazy=off prompt=ctx65536.txt timeout=600 evict=evict ===
+[20:27:31] evicting page cache (reading 120G of DeepSeek weights)
+               total        used        free      shared  buff/cache   available
+Mem:             121           8          33           0          86         113
+Swap:             15           0          15
+[20:27:56] MemAvailable 113G OK
+[20:27:56] samplers started (vmstat pid 898014, iostat pid 898015)
+[20:27:56] guard pid 898023; server launching; load_t0=1788121676
+[20:31:26] health OK after 210 s (load_t0 -> health)
+[20:31:26] vmstat after-load snapshot taken
+[20:31:26] running benchmark
+run 1/1: ok ttft=168.323s total=172.710s tokens=64 decode_tps=14.359 e2e_tps=0.371
+aggregate: successful=1/1 ttft_median=168.323s decode_tps_median=14.359
+[20:34:19] benchmark rc=0
+[20:34:19] vmstat after-req snapshot taken
+[20:34:19] samplers killed
+[20:34:19] SIGTERM sent to guard 898023
+[20:36:23] WARN llama-server still alive after 120 s
+[20:36:23] === summary lazyoff-64k ===
+jsonl_rows 2
+row {"context_label": "lazyoff-64k"}
+row {"context_label": "lazyoff-64k"}
+guard_events 383
+min_mem_available_gib_during 46.05
+max_swap_growth_gib 0.22
+guard preflight child_exit_code None
+guard start child_exit_code None
+[20:36:23] === end lazyoff-64k ===

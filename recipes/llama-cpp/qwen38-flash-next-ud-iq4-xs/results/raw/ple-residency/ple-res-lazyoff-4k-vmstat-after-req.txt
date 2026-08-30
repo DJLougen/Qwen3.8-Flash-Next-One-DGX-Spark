@@ -1,0 +1,4 @@
+pgpgin 6670567949
+pgpgout 410433595
+pgfault 7396498189
+pgmajfault 33219660

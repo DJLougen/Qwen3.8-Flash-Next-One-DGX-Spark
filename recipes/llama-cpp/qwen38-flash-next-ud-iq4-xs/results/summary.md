@@ -100,7 +100,27 @@ True-cold arms (120 GiB page-cache eviction before each load; verified by ~51 Gi
 | 4k | 443 MB | 443 MB | 405 MB | 55,669 | `99a15d5b` ✓ |
 | 64k | 1,098 MB | 1,085 MB | 2,152 MB | 458,895 | `b641e2eb` ✓ |
 
-Both depths clear the pre-decided 100/500 MB materiality gates: Grok's disk-bound cold prefill **reproduces on GB10** — the lazy PLE table demand-faults a material fraction of its amplified unique-row set from NVMe during prefill (4k TTFT 10.79 s / 372.5 tok/s; 64k 170.7 s / 384.7 tok/s; guard floors held, min ≥ 43 GiB). The `--tensor-read-lazy off` / surgical-PLE-populate A/B (Step 3) was **not run**: the experiment halted at Step 2's hash gate. The residency axis is **open**, not closed. Evidence: `raw/ple-residency/`.
+Both depths clear the pre-decided 100/500 MB materiality gates: Grok's disk-bound cold prefill **reproduces on GB10** — the lazy PLE table demand-faults a material fraction of its amplified unique-row set from NVMe during prefill (4k TTFT 10.79 s / 372.5 tok/s; 64k 170.7 s / 384.7 tok/s; guard floors held, min ≥ 43 GiB). The `--tensor-read-lazy off` / surgical-PLE-populate A/B (Step 3) was originally halted by Step 2's hash gate — **the Step 3 reopen (below) has since run and closed the axis**. Evidence: `raw/ple-residency/`.
+
+### PLE residency Step 3 reopen — `--tensor-read-lazy off` A/B (2026-08-30, `no-win`)
+
+True-cold A/B at both depths, flags identical to Gate 0 except `--tensor-read-lazy off` (whole-GGUF `MAP_POPULATE` at load — load-window reads 87.5/117.8 GB, load→health +31–70 s). Outputs byte-identical (`99a15d5b`/`b641e2eb`), guard floors held (min 47.26/46.05 GiB, swap ≤ 0.23 GiB, no hard kill):
+
+| Arm | TTFT | vs Gate 0 | prompt-eval | request-window reads (bi / rkB/s / pgpgin) |
+|---|---:|---:|---:|---|
+| `lazyoff-4k` | 22.674 s | **+110%** | 176.0 tok/s (was 372.5) | **~10.2 GB** all three (was 0.40–0.44 GB) |
+| `lazyoff-64k` | 168.323 s | −1.4% (sub-gate) | 390.2 tok/s (was 384.7) | **~21.9 GB** all three (was 1.1–2.2 GB) |
+
+**Verdict `no-win` — axis closed.** MAP_POPULATE populated the GGUF at load, but GB10
+unified-memory reclaim evicted the clean mapped file pages once the request's
+KV/activation working set landed, so prefill re-faulted the weights from NVMe at **25×
+(4k) / 10× (64k)** the lazy-on disk traffic — 4k TTFT doubled. Lazy-on +
+`POSIX_MADV_RANDOM` (fault only accessed PLE rows) is the correct design on this host;
+whole-file populate must not be pursued (mlock out of scope). Step 2' (`-ub 1024`
+revival) and the composition run were not run — gated on a 4k Step 3 win, which did not
+occur — so the 2026-08-29 `8.22 s / 481 tok/s` `-ub 1024` figures **remain
+era-2026-08-29** (per-ubatch hash baseline `06124a4b` established, but the revival arm
+was never needed). Evidence: `raw/ple-residency/`.
 
 ## Context allocation sweep with a short prompt
 
@@ -437,7 +457,7 @@ The comparison repository is MIT licensed, Copyright (c) 2026 0xBakeer. Its meth
 - `raw/ple-mt/`: multithreaded PLE `set_input` index computation verification — short hash check (`cb7904d8`), cold 4k TTFT scaling (11.68 s at ub512, 10.78 s at ub1024), and cold 64k benchmark
 - `patches/ple-multithreaded-set-input.patch`: patch parallelizing PLE n-gram index computation in `llm_graph_input_ple::set_input` across worker threads
 - `raw/ple-advice-random.jsonl`: unpatched RANDOM cold+steady timings
-- `raw/ple-residency/`: PLE residency Gate 0 + `-ub 1024` clean-tree revalidation — true-cold request-window disk reads 4k ≈405–443 MB / 64k ≈1,085–2,152 MB (axis open, Grok's disk-bound prefill reproduces on GB10); Step 2 stopped at the pre-decided hash gate (`06124a4b` ≠ `99a15d5b` at `-ub 1024`), TTFT not compared, Step 3 not run
+- `raw/ple-residency/`: PLE residency Gate 0 + `-ub 1024` clean-tree revalidation + Step 3 reopen `--tensor-read-lazy off` A/B — true-cold request-window disk reads 4k ≈405–443 MB / 64k ≈1,085–2,152 MB with lazy on (Grok's disk-bound prefill reproduces on GB10); lazy-off reopen **no-win** (4k TTFT 22.674 s vs 10.791 s, request-window reads rose 25×/10× — unified-memory reclaim evicts the MAP_POPULATE'd pages; axis closed, keep `--tensor-read-lazy on`); Step 2 stopped at the pre-decided hash gate (`06124a4b` ≠ `99a15d5b` at `-ub 1024`), TTFT not compared, Step 2'/composition not run
 - `raw/ple-pagesort/`: page-sorted PLE row gathering verification — short hash check (`cb7904d8`), cold 4k TTFT scaling (12.04 s), and cold 64k benchmark
 - `raw/ple-advice-ab.json`: isolated mmap-advice A/B decision record
 - `raw/ple-advice-prototype-random.jsonl`: patched RANDOM arm
