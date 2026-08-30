@@ -44,6 +44,20 @@ compute graph (`graphs reused = 0`). The patch adds shape-stability overrides:
 - Prefill is unchanged by design (padded n_kv grows each ubatch → correct rebuild),
   so cold 4k TTFT moves only with page-cache state, not with this patch.
 
+
+## 64k depth verification (2026-08-30)
+
+| Build | 64k TTFT | 64k decode | reuses |
+|---|---:|---:|---:|
+| Override build | 178.7 s (cold page cache) | **71.88 ms/tok** | 63 |
+| No-override control (same day) | 180.3 s | 73.27 ms/tok | 0 |
+
+Decode win at 64k is only **~1.9%**: at deep context the decode step is dominated by
+the 64k KV gather (GPU work), not per-token graph rebuild + launch orchestration.
+The fix's win scales inversely with per-token GPU cost — ~12% at short/4k
+(38.4-41.5 vs 43.4-45.2 ms/tok), ~2% at 64k. Prefill unchanged by design at both
+depths (2.72 vs 2.75 ms/tok server, within page-cache noise).
+
 ## Session archaeology (why prior numbers disagreed)
 
 - The Aug-29 "PLE-MT" gate runs (`graphs reused = 127/63`, decode 38-40 ms/tok, 4k
