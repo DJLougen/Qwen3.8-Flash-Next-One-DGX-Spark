@@ -298,6 +298,18 @@ Acceptance gates and verification on GB10 under `spark_guard.py` (80/36/28 GiB):
 
 Evidence: `raw/ple-mt/`, patch in `patches/ple-multithreaded-set-input.patch`.
 
+
+### Page-sorted row index gathering in `ggml-cpu` — rejected (2026-08-29)
+
+A prototype in `ggml_compute_forward_get_rows_q` (`ggml/src/ggml-cpu/ops.cpp`) sorted `(row_idx, dst_offset)` pairs in ascending memory order per thread before dequantization, testing whether monotonic DRAM streaming could reduce mmap fault latency across the 26.8 GiB PLE table.
+
+Measured on GB10 under `spark_guard.py` (80/36/28 GiB):
+
+- **Short Hash:** Verified exact reference SHA-256 `cb7904d8097240a2bc32c77e27c03a924fcb972212566d14487d20d2aa687601`.
+- **Cold 4k TTFT:** **12.039 s** (335.5 tok/s prefill) — **slower** than the PLE-MT tree baseline (**11.680 s** / 344.2 tok/s, a +3.1% slowdown).
+- **Cold 64k TTFT:** **168.465 s** — also regressed vs the PLE-MT tree (**167.539 s**) and unpatched baseline (**162.46 s**).
+
+Per-thread `O(K \log K)` sorting adds CPU overhead without overcoming Linux page-cache/DRAM latency floors. **Rejected and reverted from tree.** Evidence: `raw/ple-pagesort/`.
 Remaining untested directions, in the same safety order: fix whole-file
 `posix_fadvise(..., POSIX_FADV_SEQUENTIAL)` on lazy GGUF files; thresholded
 multithreaded `GET_ROWS` for large prefill gathers; page-sorted/deduplicated
@@ -368,6 +380,7 @@ The comparison repository is MIT licensed, Copyright (c) 2026 0xBakeer. Its meth
 - `raw/ple-mt/`: multithreaded PLE `set_input` index computation verification — short hash check (`cb7904d8`), cold 4k TTFT scaling (11.68 s at ub512, 10.78 s at ub1024), and cold 64k benchmark
 - `patches/ple-multithreaded-set-input.patch`: patch parallelizing PLE n-gram index computation in `llm_graph_input_ple::set_input` across worker threads
 - `raw/ple-advice-random.jsonl`: unpatched RANDOM cold+steady timings
+- `raw/ple-pagesort/`: page-sorted PLE row gathering verification — short hash check (`cb7904d8`), cold 4k TTFT scaling (12.04 s), and cold 64k benchmark
 - `raw/ple-advice-ab.json`: isolated mmap-advice A/B decision record
 - `raw/ple-advice-prototype-random.jsonl`: patched RANDOM arm
 - `raw/ple-advice-prototype-normal.jsonl`: patched NORMAL arm

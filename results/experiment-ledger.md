@@ -38,6 +38,7 @@ Authoritative reference of tested, rejected, parked, and untested exploration ax
 | **4-head lightning inner-loop / IQ4_XS 8-warp MMVQ** | No speedup or regressed 64k decode (17.13 vs 18.73 tok/s) | Divergent warp execution on non-power-of-two head counts; memory read amplification. | **Reverted in QSA patch.** |
 | **Whole-table PLE prewarming in VRAM (~27 GiB)** | Exceeds 36 GiB available memory threshold | Deprives 262k KV cache of essential allocation headroom. | **Rejected for general serving.** |
 | **Entropy-Gated Draft Length (`--spec-draft-p-min >= 0.60`)** | Halts drafting on arbitrary text ($p < 0.60$); emits only 3 tokens vs 64 at $p_{\min}=0.0$ (**28.38 tok/s**, 66.7% accept) | Natural text has low top-1 probability ($p < 0.60$), causing the gate to suppress drafting on nearly all steps. | **Keep `--spec-draft-p-min 0.0`** (disabled) for general serving. |
+| **Page-Sorted Row Index Gathering (`ggml-cpu/ops.cpp`)** | Cold 4k TTFT regressed (**12.04 s vs 11.68 s** on PLE-MT tree); 64k regressed (**168.5 s vs 167.5 s**) | Per-thread `O(K \log K)` index sorting adds CPU overhead without overcoming Linux page-fault latency floors. | **Rejected and reverted.** Do not sort row indices in ggml-cpu. |
 
 ---
 
@@ -51,4 +52,3 @@ Authoritative reference of tested, rejected, parked, and untested exploration ax
 | **MTP Knobs** | **Draft Temperature & Sampler Tuning** | Test greedy draft ($T_d=0$) against target temperature $T > 0$, or top-$k$ draft truncation to improve acceptance calibration. | **High** (Pure runtime/server flag evaluation) |
 | **MTP Knobs** | **Tree / Multi-Branch Speculation** | Evaluate a small 2-branch tree draft ($1 \to 2$) verified in a single masked attention pass vs linear chains. | **Medium** (Requires engine support in `llama-graph`) |
 | **PLE & I/O** | **Zero-Copy Host PLE over NVLink-C2C** | Write a CUDA kernel that directly dereferences the host-mapped PLE table over GB10 ATS hardware coherency instead of CPU staging. | **High** (Major long-context prefill TTFT accelerator) |
-| **PLE & I/O** | **Page-Sorted Row Index Gathering** | Sort row indices before gathering to access memory monotonically and minimize translation lookaside buffer (TLB) thrashing. | **Medium** (CPU algorithmic optimization in `llama-kv-cache`) |
