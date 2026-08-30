@@ -315,6 +315,23 @@ Remaining untested directions, in the same safety order: fix whole-file
 multithreaded `GET_ROWS` for large prefill gathers; page-sorted/deduplicated
 row gathers. Explicit I/O, hot-row caches, and layout/quant redesign stay last.
 
+
+### nsys profile of cold 4k prefill — decision experiment (2026-08-30)
+
+Full nsys attribution of the **11.785 s** cold 4k prompt eval (PLE-MT build,
+`llama-server.ple-mt`, `-b 2048 -ub 512`) over the exact request window:
+GPU kernel busy **4.545 s (38.5%)**; **6.62 s (56.1%)** in 13 CPU-side idle gaps
+with zero CUDA activity between ubatch bursts; H2D of gathered PLE activations
+**7 ms (0.06%)**. Neither optimization branch fires: fused gated residual
+(needs GPU >70%, measured 38.5%; elementwise chains are ~9% of TTFT) and
+zero-copy PLE (needs PLE gather+H2D >15%, measured ~0.1%) are both **not
+indicated**. The dominant cost is per-ubatch CPU serialization from broken
+CUDA-graph reuse: the QSA patch tree reports `graphs reused = 0` (rebuild
+every ubatch) vs `graphs reused = 7` on unpatched `250b61446` (prompt eval
+10.381 s at identical flags). Page-cache warmth accounts for only ~1.3 s of
+the gap total (shuffled same-length prompt on a warm server: 8.636 s vs
+9.969 s cold). New prioritized axis: QSA-native CUDA-graph-reuse fix.
+Evidence: `raw/nsys-4k/`.
 ## Parked post-gap work (not implemented)
 
 Documented from the 2026-08-29 TTFT-gap plan; **not shipped** in this recipe:
@@ -399,6 +416,7 @@ The comparison repository is MIT licensed, Copyright (c) 2026 0xBakeer. Its meth
 - `raw/ple-advice-prototype-normal.jsonl`: patched NORMAL arm
 - `raw/ple-advice-prototype-sequential.jsonl`: patched SEQUENTIAL arm
 - `patches/ple-lazy-advice.patch`: rejected env-selector prototype
+- `raw/nsys-4k/`: nsys cold 4k prefill decision experiment — session kernel/memops reports, request benchmark, guard log, and window analysis (GPU 38.5% busy, ~6.6 s CPU-side gaps, graphs-reuse breakage identified); neither fused-gated-residual nor zero-copy-PLE indicated
 Raw JSONL in this directory is the unpatched recipe evidence. Kernel-track
 timings are the sibling config
 [`../../qwen38-flash-next-ud-iq4-xs-qsa/results/qsa-kernels.md`](../../qwen38-flash-next-ud-iq4-xs-qsa/results/qsa-kernels.md).
