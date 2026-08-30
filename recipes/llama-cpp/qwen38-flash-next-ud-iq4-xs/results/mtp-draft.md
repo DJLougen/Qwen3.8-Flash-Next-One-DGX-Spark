@@ -216,12 +216,15 @@ Tested on `ctx4096.txt` (deterministic words, seed 380051), `max_tokens=64`, `n-
 
 | Target Request | Draft Sampler Mode | TTFT | Decode tok/s (client) | Server Eval Time | Draft Accept (server) | Finding |
 |---|---|---:|---:|---:|---:|---|
-| Greedy ($T=0.0$) | Backend sampling (`--spec-draft-backend-sampling`) | 11.87 s | **33.17 tok/s** | 30.55 ms/tok | **66.67% (42/63)** | Greedy baseline; accurate draft alignment. |
-| Stochastic ($T=0.7$) | Backend sampling (`--spec-draft-backend-sampling`) | 11.56 s | **19.88 tok/s** | 51.04 ms/tok | **32.29% (31/96)** | GPU sampler chain mismatch drops accept by >50%. |
-| Stochastic ($T=0.7$) | CPU sampler (`--no-spec-draft-backend-sampling`) | 12.45 s | **34.84 tok/s** | 29.10 ms/tok | **72.88% (43/59)** | CPU sampler aligns with target sampling; +75% speedup vs backend sampling. |
+| Greedy ($T=0.0$) | Backend sampling (`--spec-draft-backend-sampling`) | 11.87 s | **33.17 tok/s** | 30.55 ms/tok | **66.67% (42/63)** | Greedy baseline with device sampler chain. |
+| Stochastic ($T=0.7$) | Backend sampling (`--spec-draft-backend-sampling`) | 11.56 s | **19.88 tok/s** | 51.04 ms/tok | **32.29% (31/96)** | GPU top-k sampler generates off-distribution draft tokens; accept collapses. |
+| Stochastic ($T=0.7$) | Host sampler (`--no-spec-draft-backend-sampling`) | 12.45 s | **34.84 tok/s** | **29.10 ms/tok** | **72.88% (43/59)** | Host `common_sampler` coordinates sampling; peak speed & acceptance. |
 
-**Key Finding:** When serving stochastic requests ($T > 0$), GPU backend draft sampling causes severe rejection penalties (acceptance drops to 32.3%). Disabling backend draft sampling with `--no-spec-draft-backend-sampling` restores high acceptance (72.9%) and lifts decode throughput to **34.84 tok/s** (+75% speedup). Evidence: `raw/mtp-sampler/`.
+### Mechanism & Root Cause
+- **Why backend sampling fails on stochastic requests:** By default, `--spec-draft-backend-sampling` sets up a fixed GPU-side `llama_sampler_init_top_k(10)` chain on the draft model (`common/speculative.cpp:1363`). When target requests use non-zero temperature ($T=0.7$), the GPU draft sampler still picks greedy/top-1 draft continuations that diverge from the target model's stochastic distribution, triggering constant speculative rollbacks and slashing draft acceptance by more than half (66.7% $\to$ 32.3%).
+- **Why host sampling wins:** Passing `--no-spec-draft-backend-sampling` forces draft generation through the host-side `common_sampler` pipeline (`smpls[seq_id]`), aligning candidate generation with the target sampling constraints. This eliminates rejection thrashing, raising acceptance to **72.88%** and achieving the fastest decode throughput across all measured MTP configurations at **34.84 tok/s** (29.10 ms/token server eval time, a **+75% speedup** over backend sampling).
 
+Evidence: `raw/mtp-sampler/`.
 ## Do not
 
 - Do not use `--spec-draft-n-max 8` (PR: slower than AR; rollback-slot cost).
