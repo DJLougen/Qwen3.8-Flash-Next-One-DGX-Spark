@@ -74,7 +74,14 @@ speculation's `-1` placeholders, producing a wrong n-gram context that no benchm
 vLLM raises the attention block size **to 1600 tokens** to match this model's Mamba state page
 (`Setting attention block size to 1600 tokens…`, then pads the mamba page by 0.88% so the two are
 equal). A prompt shorter than one block therefore has **no full block to cache**: this author
-measured `prefix_cache_hits_total` at **0 across 77,254 queries** before noticing why. Repeating an
+measured `prefix_cache_hits_total` at **0 across 77,254 queries** before noticing why.
+
+⚠️ **1600 is the attention group's block, not `cache_config.block_size`.** A third KV group exists
+that this alignment does not cover — the QSA raw-key ring, a `CircularBufferSpec` whose block is its
+ring capacity, `compress_ratio * cdiv(compress_ratio + num_speculative_tokens, compress_ratio)` = 8
+with `indexer_compress_ratio 4` and MTP k=2. `v1/engine/core.py:321` sets `cache_config.block_size`
+to the **minimum over all groups**, so the configured value is plausibly 8. The hit figures above
+are the attention group's blocks and are unaffected, but do not read 1600 as the block size. Repeating an
 identical ~1,400-token prompt yields zero hits; a ~5,700-token prompt starts hitting from the third
 request. Budget at least three identical requests before concluding anything, or you measure the
 warm-up and call it a defect.
