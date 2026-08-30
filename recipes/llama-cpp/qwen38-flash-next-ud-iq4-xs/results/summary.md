@@ -76,7 +76,8 @@ server after load).
 | `-ub 512` (default) | 28.60 tok/s | 0.149 s | 12.65 s | 318.1 tok/s | 25.01 tok/s |
 | `-ub 1024` | **28.74 tok/s** | 0.152 s | **8.22 s** | **481.3 tok/s** | **25.18 tok/s** |
 
-`-ub 1024` yields a **35% reduction in cold 4k TTFT** (8.22 s vs 12.65 s) by lifting prompt prefill from ~318 to **~481 tok/s** on GB10, while keeping short decode at **~28.7 tok/s**. Evidence: `raw/ubatch-sweep/`.
+`-ub 1024` yields a **35% reduction in cold 4k TTFT** (8.22 s vs 12.65 s) by lifting prompt prefill from ~318 to **~481 tok/s** on GB10, while keeping short decode at **~28.7 tok/s**. Evidence: `raw/ubatch-sweep/`. **Caveat (2026-08-30):** the clean-tree revalidation (`raw/ple-residency/`) stopped at the pre-decided hash gate — at `-ub 1024` the 4k output hash is `06124a4b`, not the `-ub 512`-era reference `99a15d5b` (ubatch-split numerics divergence, not binary drift — the same binary matched `99a15d5b`/`b641e2eb` at `-ub 512` minutes earlier). The 8.22 s figure therefore stays an era-2026-08-29 result, not a clean-tree validated one; establish a per-ubatch hash baseline before reusing the digest as a cross-ubatch control gate.
+
 
 ### Deep-context microbatch scaling (`-ub 1024` at 64k / 128k)
 
@@ -88,7 +89,19 @@ Measured 2026-08-29 on fresh unpatched servers per depth with per-depth context 
 | 65,536 | 65,395 | 162.46 s | 404.18 tok/s | **163.53 s** | **~400 tok/s** | 19.96 tok/s | +0.7% | -1.0% |
 | 131,072 | 130,931 | 538.32 s* | ~243 tok/s* | **386.77 s** | **339.47 tok/s** | 16.32 tok/s | **-28.1%** | **+39.7%** |
 
-\*128k comparison point from the 2026-08-27 `b512`/`ub128` baseline sweep (538.32 s TTFT / 8.16 tok/s decode). At 64k, TTFT is essentially flat (+0.7%) as PLE memory/IO bottlenecks dominate over chunk launch batching. At 128k, `-ub 1024` cuts TTFT by 151.6 s (**28.1% reduction**) and lifts prefill from ~243 to **339.5 tok/s**. Evidence: `raw/deep-ub1024/`.
+\*128k comparison point from the 2026-08-27 `b512`/`ub128` baseline sweep (538.32 s TTFT / 8.16 tok/s decode). At 64k, TTFT is essentially flat (+0.7%) as PLE memory/IO bottlenecks dominate over chunk launch batching. At 128k, `-ub 1024` cuts TTFT by 151.6 s (**28.1% reduction**) and lifts prefill from ~243 to **339.5 tok/s**. Evidence: `raw/deep-ub1024/`. Subject to the same 2026-08-30 hash-gate caveat above.
+
+### PLE residency Gate 0 — cold-prefill disk reads (2026-08-30, lazy on)
+
+True-cold arms (120 GiB page-cache eviction before each load; verified by ~51 GiB load-window `pgpgin`), request-window disk reads by three estimators:
+
+| Depth | vmstat `bi` | iostat `rkB/s` | pgpgin | pgmajfault | Hash |
+|---:|---:|---:|---:|---:|---|
+| 4k | 443 MB | 443 MB | 405 MB | 55,669 | `99a15d5b` ✓ |
+| 64k | 1,098 MB | 1,085 MB | 2,152 MB | 458,895 | `b641e2eb` ✓ |
+
+Both depths clear the pre-decided 100/500 MB materiality gates: Grok's disk-bound cold prefill **reproduces on GB10** — the lazy PLE table demand-faults a material fraction of its amplified unique-row set from NVMe during prefill (4k TTFT 10.79 s / 372.5 tok/s; 64k 170.7 s / 384.7 tok/s; guard floors held, min ≥ 43 GiB). The `--tensor-read-lazy off` / surgical-PLE-populate A/B (Step 3) was **not run**: the experiment halted at Step 2's hash gate. The residency axis is **open**, not closed. Evidence: `raw/ple-residency/`.
+
 ## Context allocation sweep with a short prompt
 
 These rows measure the cost of allocating a larger context while processing the same 76-token prompt. They do **not** represent decode at that depth.
@@ -424,6 +437,7 @@ The comparison repository is MIT licensed, Copyright (c) 2026 0xBakeer. Its meth
 - `raw/ple-mt/`: multithreaded PLE `set_input` index computation verification — short hash check (`cb7904d8`), cold 4k TTFT scaling (11.68 s at ub512, 10.78 s at ub1024), and cold 64k benchmark
 - `patches/ple-multithreaded-set-input.patch`: patch parallelizing PLE n-gram index computation in `llm_graph_input_ple::set_input` across worker threads
 - `raw/ple-advice-random.jsonl`: unpatched RANDOM cold+steady timings
+- `raw/ple-residency/`: PLE residency Gate 0 + `-ub 1024` clean-tree revalidation — true-cold request-window disk reads 4k ≈405–443 MB / 64k ≈1,085–2,152 MB (axis open, Grok's disk-bound prefill reproduces on GB10); Step 2 stopped at the pre-decided hash gate (`06124a4b` ≠ `99a15d5b` at `-ub 1024`), TTFT not compared, Step 3 not run
 - `raw/ple-pagesort/`: page-sorted PLE row gathering verification — short hash check (`cb7904d8`), cold 4k TTFT scaling (12.04 s), and cold 64k benchmark
 - `raw/ple-advice-ab.json`: isolated mmap-advice A/B decision record
 - `raw/ple-advice-prototype-random.jsonl`: patched RANDOM arm

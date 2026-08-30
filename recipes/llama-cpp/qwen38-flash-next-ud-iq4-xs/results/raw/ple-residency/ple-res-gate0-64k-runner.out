@@ -1,0 +1,27 @@
+[19:41:01] === arm gate0-64k ctx=65536 ub=512 lazy=on prompt=ctx65536.txt timeout=600 evict=evict ===
+[19:41:01] evicting page cache (reading 120G of DeepSeek weights)
+read_bytes 129897443392
+               total        used        free      shared  buff/cache   available
+Mem:             121           8          29           0          89         113
+Swap:             15           0          15
+[19:41:31] MemAvailable 113G OK
+[19:41:31] samplers started (vmstat pid 884817, iostat pid 884818)
+[19:41:31] guard pid 884826; server launching; load_t0=1788118891
+[19:43:51] health OK after 140 s (load_t0 -> health)
+[19:43:51] vmstat after-load snapshot taken
+[19:43:51] running benchmark
+[19:46:46] benchmark rc=0
+[19:46:46] vmstat after-req snapshot taken
+[19:46:46] samplers killed
+[19:46:46] SIGTERM sent to guard 884826
+[19:48:49] WARN llama-server still alive after 120 s
+[19:48:49] === summary gate0-64k ===
+jsonl_rows 2
+row {"context_label": "gate0-64k"}
+row {"context_label": "gate0-64k"}
+guard_events 316
+min_mem_available_gib_during 43.27
+max_swap_growth_gib 0.218
+guard preflight child_exit_code None
+guard start child_exit_code None
+[19:48:49] === end gate0-64k ===

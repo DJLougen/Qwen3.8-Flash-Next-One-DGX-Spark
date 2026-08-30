@@ -1,0 +1,27 @@
+[19:49:33] === arm ub1024-4k ctx=4096 ub=1024 lazy=on prompt=ctx4096.txt timeout=300 evict=evict ===
+[19:49:33] evicting page cache (reading 120G of DeepSeek weights)
+read_bytes 129897443392
+               total        used        free      shared  buff/cache   available
+Mem:             121           8          32           0          87         113
+Swap:             15           0          15
+[19:49:58] MemAvailable 113G OK
+[19:49:58] samplers started (vmstat pid 888404, iostat pid 888405)
+[19:49:58] guard pid 888413; server launching; load_t0=1788119398
+[19:52:00] health OK after 122 s (load_t0 -> health)
+[19:52:00] vmstat after-load snapshot taken
+[19:52:00] running benchmark
+[19:52:13] benchmark rc=0
+[19:52:13] vmstat after-req snapshot taken
+[19:52:13] samplers killed
+[19:52:13] SIGTERM sent to guard 888413
+[19:54:17] WARN llama-server still alive after 120 s
+[19:54:17] === summary ub1024-4k ===
+jsonl_rows 2
+row {"context_label": "ub1024-4k"}
+row {"context_label": "ub1024-4k"}
+guard_events 136
+min_mem_available_gib_during 47.68
+max_swap_growth_gib 0.212
+guard preflight child_exit_code None
+guard start child_exit_code None
+[19:54:17] === end ub1024-4k ===
