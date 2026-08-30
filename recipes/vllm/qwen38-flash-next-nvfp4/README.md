@@ -14,10 +14,16 @@ but the measured numbers this author holds are for a *derived* checkpoint (see
 - **Swap.** At least 48 GiB. The PLE table is offloaded to *pageable* host memory by design; with
   no swap the offload worker is OOM-killed during startup and vLLM reports only
   `PLE offload worker exited during startup`.
-- vLLM `0.1.dev20073+g8e685d198` — a preview build of
-  [vllm#53896](https://github.com/vllm-project/vllm/pull/53896). **This model is not on `main` and
-  not in any release.** `run.sh` refuses to start against another version unless
-  `ALLOW_UNPINNED_VLLM=1`.
+- vLLM `0.1.dev20073+g8e685d198` — a preview build combining
+  [vllm#53896](https://github.com/vllm-project/vllm/pull/53896) (the model) and
+  [vllm#53899](https://github.com/vllm-project/vllm/pull/53899) (PLE offload). **This model is not
+  on `main` and not in any release**, and *neither PR alone reproduces this tree* —
+  `vllm/v1/ple_offload/` exists only on #53899. `run.sh` refuses to start against another version
+  unless `ALLOW_UNPINNED_VLLM=1`.
+
+  ⚠️ **Paths in this document are build-specific.** Since this build, #53896 renamed the package
+  `vllm/models/qwen3_8_flash_next/` → `vllm/models/qwen4_exp/`, and refactored the NGram helpers
+  (+108/−73 in `ple_layer.py`). Findings below still hold; the file names have moved.
 
 ## Quick start
 
