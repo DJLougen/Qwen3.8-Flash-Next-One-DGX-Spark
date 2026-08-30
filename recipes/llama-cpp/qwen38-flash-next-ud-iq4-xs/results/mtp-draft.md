@@ -234,6 +234,7 @@ Evidence: `raw/mtp-sampler/`.
 - The upstream llama.cpp MTP PR remains closed/unmerged; this track is local-only
   on `llama.cpp-qwen4exp-kmtp`.
 - Do not run kmtp at 64k with `-ub 512` until the hybrid-memory ubatch interaction is fixed.
+- Do not use default backend sampling (`--spec-draft-backend-sampling`) when serving non-zero temperature requests ($T > 0$); pass `--no-spec-draft-backend-sampling` to prevent rejection collapse (32.3% $\to$ 72.9% accept, **+75% speedup**).
 
 ## Parked post-gap work (not implemented)
 
