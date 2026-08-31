@@ -459,6 +459,30 @@ T1 is the largest prefill move since PLE-MT. T7 showed it is **not** the PLE
 IQ4_NL dequant loop (that is CUDA `getrows.cu`) — it is the remaining CPU
 GET_ROWS sites. Short-hash `cb7904d8` held on T1 and T10.
 
+By context length (true-cold unless noted):
+
+| Ctx | Config | TTFT (s) | Prefill tok/s | Decode tok/s | Hash | Guard min GiB |
+|---|---|---:|---:|---:|---|---:|
+| ~76 (warm) | Gate 0 ub512 | 0.149 | — | 28.6 | `cb7904d8` | — |
+| ~76 (warm) | T1 GET_ROWS | 0.144 | — | 26.66 | `cb7904d8` | — |
+| ~76 (warm) | T5 kmtp+MTP | 0.322 | — | 26.54 | — | — |
+| **4k** | Gate 0 ub512 | 10.791 | 372.5 | 24.6 | `99a15d5b` | — |
+| **4k** | T1 GET_ROWS ub512 | **6.806** | **599.9** | 23.42 | `99a15d5b` | 50.86 |
+| **4k** | T3 ub1024 | **9.199** | 438.9 | 23.79 | `06124a4b` | — |
+| **4k** | T9 kmtp ub512 | 12.011 | 335.0 | 24.95 | `c64973d8` | 50.86 |
+| **64k** | Gate 0 ub512 | 170.663 | 384.7 | 14.5 | `b641e2eb` | — |
+| **64k** | T1 GET_ROWS ub512 | **131.94** | **498.1** | 13.96 | `b641e2eb` | — |
+| **64k** | T3 ub1024 | **160.99** | 408.4 | 14.35 | `a81283e2` | — |
+| **64k** | T9 kmtp ub512 | 166.57 | 393.9 | **20.44** | `b0ea9f23` | 47.71 |
+| **128k** | era f16 ub1024 | 386.77 | 339.5 | — | — | — |
+| **128k** | T4 kvq8 ub1024 | 397.5 | 330.4 | 9.78 | `9b622db0` | 44.2 |
+| **230k / 262k** | T4 kvf16 | — | — | — | — | **35.77 breach** |
+| **230k / 262k** | T4 kvq8 ub1024 | 901.65 | 255.4 | 6.20 | `1cda86a2` | 37.97 |
+| **230k** | T9 kmtp ub1024 | 922.76 | 249.6 | **12.94** | `e2875202` | 36.12 |
+
+T1 owns 4k/64k prefill. T9 owns 64k/230k decode (QSA). T4 q8_0 is the only config that loads 262k under the 36 GiB floor.
+
+
 ## Raw evidence
 
 - `raw/ctx1024-nocache-v1.jsonl`: honest short-prompt baseline
