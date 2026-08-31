@@ -1,0 +1,106 @@
+diff --git a/tools/server/server-context.cpp b/tools/server/server-context.cpp
+index e6c991f7c..84c939ba2 100644
+--- a/tools/server/server-context.cpp
++++ b/tools/server/server-context.cpp
+@@ -11,6 +11,8 @@
+ #include "common.h"
+ #include "fit.h"
+ #include "llama.h"
++// tt10-t2: direct access to model PLE table + hparams for row prefetch
++#include "src/llama-model.h"
+ #include "log.h"
+ #include "sampling.h"
+ #include "speculative.h"
+@@ -27,6 +29,10 @@
+ #include <utility>
+ #include <fstream>
+ 
++#if !defined(_WIN32)
++#   include <sys/mman.h>   // tt10-t2: posix_madvise
++#endif
++
+ // fix problem with std::min and std::max
+ #if defined(_WIN32)
+ #define WIN32_LEAN_AND_MEAN
+@@ -4199,6 +4205,69 @@ void server_context::set_state_callback(server_state_callback_t callback) {
+ // server_routes
+ //
+ 
++
++// tt10-t2: PLE row prefetch — replicate llm_graph_input_ple::set_input n-gram row
++// hashing over the tokenized prompt and posix_madvise(WILLNEED) each row so demand
++// faults overlap with compute during the first prefill ubatch. Best-effort: any
++// failure is silently ignored (madvise is advisory).
++static void prefetch_ple_rows(server_context_impl & ctx_server, const server_tokens & tokens) {
++    const llama_model * model = ctx_server.model_tgt;
++    if (model == nullptr) {
++        return;
++    }
++    const auto & hp = model->hparams;
++    const ggml_tensor * ple = model->per_layer_tok_embd;
++    if (ple == nullptr || hp.ple_n_heads == 0 || hp.ple_ngram_size < 2 || hp.ple_ngram_size > 16) {
++        return; // not a PLE model — no-op
++    }
++    const size_t n_tokens = tokens.size();
++    if (n_tokens == 0) {
++        return;
++    }
++    const int64_t n_gram   = hp.ple_ngram_size;
++    const int64_t n_heads  = hp.ple_n_heads;
++    const int64_t per_gram = hp.ple_heads_per_ngram;
++    const int64_t eos      = hp.ple_eos_token_id;
++    const int64_t n_prev   = n_gram - 1;
++    // stand-in token for media positions, mirroring set_input img_tok
++    const llama_token img_tok = hp.ple_image_token_id != 0
++        ? (llama_token) hp.ple_image_token_id
++        : (llama_token) hp.ple_eos_token_id;
++    auto tok_of = [&](size_t k) -> llama_token {
++        const llama_token t = tokens[k];
++        return t == LLAMA_TOKEN_NULL ? img_tok : t;
++    };
++    const char * base = (const char *) ple->data;
++    const size_t row_bytes = (size_t) ple->nb[1]; // bytes per row (row stride)
++    for (size_t i = 0; i < n_tokens; ++i) {
++        int64_t ctx[16];
++        ctx[0] = tok_of(i);
++        bool cut = false;
++        for (int64_t s = 1; s < n_gram; ++s) {
++            // predecessor of position i+s-th gram element: token i-s (prompt-local;
++            // for the first tokens of the prompt this under-advices — acceptable
++            // superset/under-set tradeoff, see tt10 ANALYSIS)
++            const llama_token tok = (int64_t) i >= s ? tok_of(i - s) : (llama_token) LLAMA_TOKEN_NULL;
++            cut = cut || tok < 0 || tok == eos;
++            ctx[s] = cut ? eos : tok;
++        }
++        for (int64_t n = 2; n <= n_gram; ++n) {
++            uint64_t mixed = (uint64_t) ctx[0] * hp.ple_layer_multipliers[0];
++            for (int64_t j = 1; j < n; ++j) {
++                mixed ^= (uint64_t) ctx[j] * hp.ple_layer_multipliers[j];
++            }
++            const int64_t base_h = (n - 2) * per_gram;
++            for (int64_t g = 0; g < per_gram; ++g) {
++                const int64_t h_i = base_h + g;
++                const int64_t row = (int64_t) (mixed % hp.ple_head_vocab_sizes[h_i] + hp.ple_head_offsets[h_i]);
++                const uintptr_t addr = (uintptr_t) (base + row * row_bytes);
++                // advise the full 4 KiB page containing the row (rows are 90 B)
++                (void) posix_madvise((void *) (addr & ~0xFFFUL), 4096, POSIX_MADV_WILLNEED);
++            }
++        }
++    }
++}
++
+ std::unique_ptr<server_res_generator> server_routes::handle_completions_impl(
+             const server_http_req & req,
+             server_task_type type,
+@@ -4244,6 +4313,11 @@ std::unique_ptr<server_res_generator> server_routes::handle_completions_impl(
+             inputs = tokenize_input_prompts(ctx_server.vocab, ctx_server.mctx, prompt, true, true, ctx_server.init_opt);
+         }
+ 
++        // tt10-t2: prefetch PLE rows for every tokenized prompt (best-effort)
++        for (const auto & in : inputs) {
++            prefetch_ple_rows(ctx_server, in);
++        }
++
+         // tasks.reserve(inputs.size()); // TODO: this is inaccurate due to child tasks
+ 
+         // message delimiters for checkpointing

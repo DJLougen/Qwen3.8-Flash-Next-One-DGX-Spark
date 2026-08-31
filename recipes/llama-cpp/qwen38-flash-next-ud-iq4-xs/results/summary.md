@@ -437,6 +437,28 @@ Research clone: `0xBakeer/qwen38-flash-next-spark` commit `4c6fc3af429bff5c47251
 
 The comparison repository is MIT licensed, Copyright (c) 2026 0xBakeer. Its methodology informed the varied task suite and rejected graph-reuse experiment; no third-party code is shipped here.
 
+## Ten optimization tests (2026-08-30/31)
+
+Campaign after the PLE-residency axis closed (`no-win`, commit `ee73c38`). Full
+table and per-patch ANALYSIS under [`raw/ten-tests/`](raw/ten-tests/). Headline:
+
+| Test | Verdict | Headline |
+|---|---|---|
+| T1 GET_ROWS `n_tasks = n_threads` | **win (prefill)** / decode −6.8% | 4k TTFT **6.806 s** (−37% vs 10.791), hash `99a15d5b` exact |
+| T2 PLE `posix_madvise(WILLNEED)` | rejected | request-window reads unchanged (410 / 2018 MB) |
+| T3 `-ub 1024` revival | **win** | 4k **9.199 s** (`06124a4b`); 64k 160.99 s (`a81283e2`) |
+| T4 KV `q8_0` at 262k | **enabling win** | f16 262k guard-breach (35.77 GiB); q8_0 runs (37.97 GiB, 901.65 s) |
+| T5 can-reuse × MTP | no-win | 26.54 tok/s vs 40.5 MTP-alone; main-tree draft load failed |
+| T6 spec-on varied tasks | **release row** | +10–45% decode vs spec-off; accept 78.3% |
+| T7 PLE row cache in `get_rows_q` | rejected | CPU `get_rows_q` never runs; PLE gather is CUDA |
+| T8 mixed-lane `-np 2` | gate-fail | decode lane 12.87 tok/s < 15 (`--no-cache-prompt`) |
+| T9 kmtp QSA×can-reuse | **integration proven** | 4k hash `c64973d8` byte-stable; 64k 20.44 tok/s; 230k 12.94 tok/s |
+| T10 `PLE_MT_THREADS` at ub1024 | no-win | best warm-first 9.156 s (pool 6); cold 10.793 s |
+
+T1 is the largest prefill move since PLE-MT. T7 showed it is **not** the PLE
+IQ4_NL dequant loop (that is CUDA `getrows.cu`) — it is the remaining CPU
+GET_ROWS sites. Short-hash `cb7904d8` held on T1 and T10.
+
 ## Raw evidence
 
 - `raw/ctx1024-nocache-v1.jsonl`: honest short-prompt baseline
@@ -471,6 +493,8 @@ The comparison repository is MIT licensed, Copyright (c) 2026 0xBakeer. Its meth
 - `raw/rmsnorm-fusion/`: fused zero-centered RMSNorm investigation — axis closed as not indicated: (1+w) already converter-folded, GEMM alpha structurally scalar, existing {RMS_NORM,MUL} fuser covers legal sites, qwen4exp sites fail fusion gates structurally, prize ~0.5-1% decode
 - `raw/deep-prefill-levers/`: deep-context prefill sizing + prefill graph-rebuild direct measurement — prefill-stable QSA graph CLOSED (build+alloc is 3.6-5.3 ms/ubatch, ~0.3-0.4% of prompt eval; nsys gaps are the host PLE gather path, not rebuild); decode graph-reuse win at 64k (71.88 vs 73.27 ms/tok, ~1.9%); ATS microbench named as deep-lane gate (failed, see ats-microbench)
 - `raw/ats-microbench/`: zero-copy host PLE first gate — ATS sustained 8.11 GB/s (1 GiB) / 6.36 GB/s (8 GiB cache-defeated) at 90-byte random granularity, failing the ≥20 GB/s plan gate; reframe: PLE demand ~1.4 MB/s/ubatch is 4,500x under the measured floor, so deep prefill is not interconnect-bound (sources + analysis)
+- `raw/ten-tests/`: 2026-08-30/31 ten-test campaign (T1–T10) — jsonl, server logs (`git add -f`), vmstat snapshots, per-patch ANALYSIS, campaign rollup
+- `patches/tt10-t1.patch` / `tt10-t2.patch` / `tt10-t7.patch` / `tt10-t10.patch`: T1 GET_ROWS fan-out (measured win), T2 prefetch (rejected), T7 row cache (rejected, path absent), T10 PLE_MT env (no-win)
 Raw JSONL in this directory is the unpatched recipe evidence. Kernel-track
 timings are the sibling config
 [`../../qwen38-flash-next-ud-iq4-xs-qsa/results/qsa-kernels.md`](../../qwen38-flash-next-ud-iq4-xs-qsa/results/qsa-kernels.md).

@@ -1,0 +1,6 @@
+warmup 1/1: ok ttft=1.503s total=6.369s tokens=128 decode_tps=26.103 e2e_tps=20.099
+run 1/3: ok ttft=0.291s total=4.850s tokens=128 decode_tps=27.853 e2e_tps=26.390
+run 2/3: ok ttft=0.140s total=4.721s tokens=128 decode_tps=27.725 e2e_tps=27.114
+run 3/3: ok ttft=0.139s total=4.704s tokens=128 decode_tps=27.821 e2e_tps=27.209
+aggregate: successful=3/3 ttft_median=0.140s decode_tps_median=27.821
+done t10-short3

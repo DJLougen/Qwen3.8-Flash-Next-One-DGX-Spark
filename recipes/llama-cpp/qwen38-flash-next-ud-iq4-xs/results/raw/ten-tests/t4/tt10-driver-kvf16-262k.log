@@ -1,0 +1,25 @@
+[22:57:11] === arm kvf16-262k ctx=262144 ub=1024 lazy=on prompt=ctx230000.txt timeout=1800 evict=evict ===
+[22:57:11] evicting page cache (reading 120G of DeepSeek weights)
+read_bytes 129897443392
+               total        used        free      shared  buff/cache   available
+Mem:             121           8           8           0         110         113
+Swap:             15           0          15
+[22:57:34] MemAvailable 113G OK
+[22:57:34] samplers started (vmstat pid 943553, iostat pid 943554)
+[22:57:34] guard pid 943562; server launching; load_t0=1788130654
+[22:58:40] ERROR guard exited before health (check guard jsonl)
+[22:58:40] ERROR health never became ok
+[22:58:40] vmstat after-load snapshot taken
+[22:58:40] SKIP benchmark (unhealthy)
+[22:58:40] vmstat after-req snapshot taken
+[22:58:40] samplers killed
+[22:58:40] llama-server gone (teardown complete)
+[22:58:40] === summary kvf16-262k ===
+guard_events 69
+min_mem_available_gib_during 35.77
+max_swap_growth_gib 0.225
+guard preflight child_exit_code None
+guard start child_exit_code None
+guard soft_stop child_exit_code None
+guard exit child_exit_code -15
+[22:58:40] === end kvf16-262k ===

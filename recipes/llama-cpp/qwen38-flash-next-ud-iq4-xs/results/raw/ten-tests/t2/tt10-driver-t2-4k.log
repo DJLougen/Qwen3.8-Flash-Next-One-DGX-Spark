@@ -1,0 +1,27 @@
+[00:47:10] === arm t2-4k ctx=4096 ub=512 lazy=on prompt=ctx4096.txt timeout=300 evict=evict ===
+[00:47:10] evicting page cache (reading 120G of DeepSeek weights)
+read_bytes 129897443392
+               total        used        free      shared  buff/cache   available
+Mem:             121           8          18           0         100         113
+Swap:             15           0          15
+[00:47:35] MemAvailable 113G OK
+[00:47:35] samplers started (vmstat pid 996215, iostat pid 996216)
+[00:47:35] guard pid 996224; server launching; load_t0=1788137255
+[00:49:53] health OK after 138 s (load_t0 -> health)
+[00:49:53] vmstat after-load snapshot taken
+[00:49:54] running benchmark
+[00:50:03] benchmark rc=0
+[00:50:03] vmstat after-req snapshot taken
+[00:50:03] samplers killed
+[00:50:03] SIGTERM sent to guard 996224
+[00:51:31] llama-server gone (teardown complete)
+[00:51:31] === summary t2-4k ===
+jsonl_rows 2
+row {"context_label": "t2-4k"}
+row {"context_label": "t2-4k"}
+guard_events 150
+min_mem_available_gib_during 48.06
+max_swap_growth_gib 0.222
+guard preflight child_exit_code None
+guard start child_exit_code None
+[00:51:31] === end t2-4k ===

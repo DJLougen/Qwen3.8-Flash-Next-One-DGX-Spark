@@ -1,0 +1,6 @@
+Running mixed-lane np2 probe (64k prefill lane + short decode lane)...
+Batch Wall: 5.01s | Success: 1/2
+Aggregate Decode TPS: 25.56 tok/s
+Per-slot TTFT Median: 0.475 s
+Per-slot Decode TPS Median: 28.27 tok/s
+Wrote results to /tmp/tt10-t8-results/mixed-lane-np2.jsonl

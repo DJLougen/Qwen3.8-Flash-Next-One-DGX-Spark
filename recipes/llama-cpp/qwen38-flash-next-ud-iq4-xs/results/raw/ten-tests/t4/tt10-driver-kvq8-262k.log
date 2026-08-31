@@ -1,0 +1,27 @@
+[23:02:01] === arm kvq8-262k ctx=262144 ub=1024 lazy=on prompt=ctx230000.txt timeout=1800 evict=evict ===
+[23:02:01] evicting page cache (reading 120G of DeepSeek weights)
+read_bytes 129897443392
+               total        used        free      shared  buff/cache   available
+Mem:             121           8           9           0         109         113
+Swap:             15           0          15
+[23:02:25] MemAvailable 113G OK
+[23:02:25] samplers started (vmstat pid 947884, iostat pid 947885)
+[23:02:25] guard pid 947893; server launching; load_t0=1788130945
+[23:03:56] health OK after 91 s (load_t0 -> health)
+[23:03:56] vmstat after-load snapshot taken
+[23:03:56] running benchmark
+[23:19:08] benchmark rc=0
+[23:19:08] vmstat after-req snapshot taken
+[23:19:08] samplers killed
+[23:19:08] SIGTERM sent to guard 947893
+[23:20:15] llama-server gone (teardown complete)
+[23:20:15] === summary kvq8-262k ===
+jsonl_rows 2
+row {"context_label": "kvq8-262k"}
+row {"context_label": "kvq8-262k"}
+guard_events 1003
+min_mem_available_gib_during 37.97
+max_swap_growth_gib 0.235
+guard preflight child_exit_code None
+guard start child_exit_code None
+[23:20:15] === end kvq8-262k ===

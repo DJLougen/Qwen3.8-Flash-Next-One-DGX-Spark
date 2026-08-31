@@ -1,0 +1,34 @@
+[  1%] Built target vendor-hash
+[  1%] Built target llama-common-base
+[  1%] Built target llama-ui-embed
+[  4%] Built target ggml-base
+[  4%] Built target cpp-httplib
+[  4%] Provisioning UI assets
+-- UI: downloading from b2757: https://huggingface.co/buckets/ggml-org/llama-ui/resolve/b2757/dist.tar.gz
+[  7%] Built target ggml-cpu
+-- UI: download dist.tar.gz from b2757 failed: "HTTP response code said error"
+-- UI: downloading from latest: https://huggingface.co/buckets/ggml-org/llama-ui/resolve/latest/dist.tar.gz
+[ 37%] Built target ggml-cuda
+[ 37%] Built target ggml
+[ 76%] Built target llama
+[ 84%] Built target llama-common
+[ 95%] Built target mtmd
+[ 95%] Building CXX object tools/server/CMakeFiles/server-context.dir/server-context.cpp.o
+-- UI: archive verified and extracted
+-- UI: HF download succeeded, stamp updated (latest)
+-- UI: gzip compression applied (/home/djl/llama.cpp-tt10-t1/build/tools/ui/dist/_gzip)
+[ 95%] Built target llama-ui-assets
+[ 97%] Built target llama-ui
+/home/djl/llama.cpp-tt10-t1/tools/server/server-context.cpp: In function 'void prefetch_ple_rows(server_context_impl&, const server_tokens&)':
+/home/djl/llama.cpp-tt10-t1/tools/server/server-context.cpp:4228:19: warning: unused variable 'n_heads' [-Wunused-variable]
+ 4228 |     const int64_t n_heads  = hp.ple_n_heads;
+      |                   ^~~~~~~
+/home/djl/llama.cpp-tt10-t1/tools/server/server-context.cpp:4231:19: warning: unused variable 'n_prev' [-Wunused-variable]
+ 4231 |     const int64_t n_prev   = n_gram - 1;
+      |                   ^~~~~~
+[ 97%] Linking CXX static library libserver-context.a
+[ 98%] Built target server-context
+[100%] Linking CXX shared library ../../bin/libllama-server-impl.so
+[100%] Built target llama-server-impl
+[100%] Linking CXX executable ../../bin/llama-server
+[100%] Built target llama-server
