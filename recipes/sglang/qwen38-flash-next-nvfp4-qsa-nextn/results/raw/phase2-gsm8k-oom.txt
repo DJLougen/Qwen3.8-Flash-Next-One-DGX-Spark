@@ -1,0 +1,59 @@
+==========================================================================
+GSM8K -- first 40 of the official test split
+==========================================================================
+    1/40 gold=      18 pred=      18 ok
+    2/40 gold=       3 pred=       3 ok
+    3/40 gold=   70000 pred=   70000 ok
+    4/40 gold=     540 pred=     540 ok
+    5/40 gold=      20 pred=      20 ok
+    6/40 gold=      64 pred=      64 ok
+    7/40 gold=     260 pred=     260 ok
+    8/40 gold=     160 pred=     160 ok
+    9/40 gold=      45 pred=      45 ok
+   10/40 gold=     460 pred=     460 ok
+   11/40 gold=     366 pred=     366 ok
+   12/40 gold=     694 pred=     694 ok
+   13/40 gold=      13 pred=      12 MISS
+   14/40 gold=      18 pred=      18 ok
+   15/40 gold=      60 pred=      60 ok
+   16/40 gold=     125 pred=     125 ok
+   17/40 gold=     230 pred=     230 ok
+   18/40 gold=   57500 pred=   57500 ok
+   19/40 gold=       7 pred=       7 ok
+   20/40 gold=       6 pred=       6 ok
+   21/40 gold=      15 pred=      15 ok
+   22/40 gold=      14 pred=      14 ok
+   23/40 gold=       7 pred=       7 ok
+   24/40 gold=       8 pred=       8 ok
+   25/40 gold=      26 pred=      26 ok
+   26/40 gold=       2 pred=       2 ok
+   27/40 gold=     243 pred=     243 ok
+   28/40 gold=      16 pred=      16 ok
+   29/40 gold=      25 pred=      25 ok
+   30/40 gold=     104 pred=     104 ok
+   31/40 gold=     109 pred=     109 ok
+   32/40 gold=      80 pred=      80 ok
+   33/40 gold=      35 pred=      35 ok
+   34/40 gold=      70 pred=      70 ok
+   35/40 gold=      23 pred=      23 ok
+   36/40 gold=       9 pred=       9 ok
+   37/40 gold=      75 pred=      75 ok
+   38/40 gold=       2 pred=       2 ok
+   39/40 gold=      10 pred=      10 ok
+   40/40 gold=      18 pred=      18 ok
+
+GSM8K: 39/40 = 97.5%
+
+[saved phase 'gsm8k' -> <workdir>/results.json]
+==========================================================================
+OOM BOUNDARY -- ramp concurrent long requests until failure
+==========================================================================
+streams  1: 1/1 ok | free None GB
+streams  2: 2/2 ok | free None GB
+streams  4: 4/4 ok | free None GB
+streams  8: 8/8 ok | free None GB
+streams 16: 16/16 ok | free None GB
+
+no failure up to 16 concurrent streams
+
+[saved phase 'oom' -> <workdir>/results.json]

@@ -1,0 +1,19 @@
+{
+  "$schema": "../../../schema/recipe.schema.json",
+  "schema_version": 1,
+  "id": "sglang/qwen38-flash-next-nvfp4-qsa-nextn",
+  "title": "Qwen3.8-Flash-Next NVFP4 (QSA + NVMe PLE + NEXTN MTP)",
+  "summary": "Full 262k-context NVFP4 serving on one GB10 by streaming the 47.7 GiB PLE table from NVMe, with NEXTN speculative decoding.",
+  "runtime": "sglang",
+  "model": {
+    "repository": "RadixArk/Qwen3.8-Flash-Next-NVFP4",
+    "revision": "7b719225242aacd3dbd3f9407468c2ee9a9d2594"
+  },
+  "hardware": {
+    "target": "NVIDIA DGX Spark",
+    "gpu": "GB10"
+  },
+  "entrypoint": "run.sh",
+  "status": "verified",
+  "tested_at": "2026-08-29"
+}
