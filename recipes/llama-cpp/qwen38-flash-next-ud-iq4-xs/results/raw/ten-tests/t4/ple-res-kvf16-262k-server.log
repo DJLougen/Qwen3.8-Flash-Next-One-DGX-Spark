@@ -1,0 +1,8 @@
+0.00.360.096 I cmn  common_param: common_params_print_info: verbosity = 3 (adjust with the `-lv N` CLI arg)
+0.00.360.740 W srv  llama_server: -----------------
+0.00.360.743 W srv  llama_server: CORS is set to allow all origins ('*') and no API key is set
+0.00.360.744 W srv  llama_server: this can be a security risk (cross-origin attacks)
+0.00.360.744 W srv  llama_server: more info: https://github.com/ggml-org/llama.cpp/pull/25655
+0.00.360.744 W srv  llama_server: -----------------
+0.00.362.085 I srv    load_model: loading model '/home/djl/models/Qwen3.8-Flash-Next-UD-IQ4_XS/UD-IQ4_XS/Qwen3.8-Flash-Next-UD-IQ4_XS-00001-of-00003.gguf'
+0.01.037.822 W llama_model_loader: tensor overrides to CPU are used with mmap enabled - consider using --load-mode none for better performance

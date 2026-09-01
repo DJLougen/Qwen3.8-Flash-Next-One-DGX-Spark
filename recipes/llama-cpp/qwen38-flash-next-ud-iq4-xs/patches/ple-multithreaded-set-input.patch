@@ -1,5 +1,5 @@
 diff --git a/src/models/qwen4exp.cpp b/src/models/qwen4exp.cpp
-index c2ab9900e..b94b8f79e 100644
+index c2ab9900e..031ed6915 100644
 --- a/src/models/qwen4exp.cpp
 +++ b/src/models/qwen4exp.cpp
 @@ -1,3 +1,4 @@
@@ -7,9 +7,7 @@ index c2ab9900e..b94b8f79e 100644
  #include "models.h"
  #include "llama-impl.h"
  #include "llama-memory-hybrid-idx.h"
-@@ -982,27 +983,61 @@ void llm_graph_input_ple::set_input(const llama_ubatch * ubatch) {
-     const int64_t n_prev   = n_gram - 1;
- 
+@@ -937,6 +938,7 @@ void llm_graph_input_ple::set_input(const llama_ubatch * ubatch) {
      std::vector<int32_t> idx(n_heads * n_tokens);
  
      GGML_ASSERT(mctx != nullptr);
@@ -17,10 +15,8 @@ index c2ab9900e..b94b8f79e 100644
  
      for (int64_t i = 0; i < n_tokens; ++i) {
          // the preceding tokens would be ambiguous, see get_prev_tokens()
-         GGML_ASSERT(ubatch->n_seq_id[i] == 1 && "PLE n-gram embeddings do not support tokens shared by multiple sequences");
-     }
- 
-     // predecessors come from the KV cells (ext.tok); apply_ubatch() already stored this ubatch, so its own tokens count as cached
+@@ -946,31 +948,65 @@ void llm_graph_input_ple::set_input(const llama_ubatch * ubatch) {
+     // predecessors come from the KV cells (ext.tok); apply_ubatch() already stored this ubatch, so its own tokens count too
      mctx->get_prev_tokens(*ubatch, n_prev, prev);
  
 -    for (int64_t i = 0; i < n_tokens; ++i) {
@@ -36,6 +32,7 @@ index c2ab9900e..b94b8f79e 100644
 -            cut = cut || t < 0 || t == eos;
 -            ctx[s] = cut ? eos : t;
 +    if (n_tokens > 1) {
++        // prefill ubatch: partition tokens across workers (exact-output hash preserved)
 +        const int n_threads = std::min<int>(12, (int) n_tokens);
 +        std::vector<std::thread> workers;
 +        workers.reserve(n_threads);
@@ -44,56 +41,28 @@ index c2ab9900e..b94b8f79e 100644
 +                const int64_t i_start = (n_tokens * t) / n_threads;
 +                const int64_t i_end   = (n_tokens * (t + 1)) / n_threads;
 +                for (int64_t i = i_start; i < i_end; ++i) {
-+                    int64_t ctx[16];
-+                    ctx[0] = tok_of(i);
-+                    bool cut = false;
-+                    for (int64_t s = 1; s < n_gram; ++s) {
-+                        const llama_token tok = cut ? LLAMA_TOKEN_NULL : prev[i*n_prev + (n_prev - s)];
-+                        cut = cut || tok < 0 || tok == eos;
-+                        ctx[s] = cut ? eos : tok;
++                int64_t ctx[16];
++                ctx[0] = tok_of(i);
++                bool cut = false;
++                for (int64_t s = 1; s < n_gram; ++s) {
++                    const llama_token tok = cut ? LLAMA_TOKEN_NULL : prev[i*n_prev + (n_prev - s)];
++                    cut = cut || tok < 0 || tok == eos;
++                    ctx[s] = cut ? eos : tok;
++                }
++                for (int64_t n = 2; n <= n_gram; ++n) {
++                    uint64_t mixed = (uint64_t) ctx[0] * hp.ple_layer_multipliers[0];
++                    for (int64_t j = 1; j < n; ++j) {
++                        mixed ^= (uint64_t) ctx[j] * hp.ple_layer_multipliers[j];
 +                    }
-+
-+                    for (int64_t n = 2; n <= n_gram; ++n) {
-+                        uint64_t mixed = (uint64_t) ctx[0] * hp.ple_layer_multipliers[0];
-+                        for (int64_t j = 1; j < n; ++j) {
-+                            mixed ^= (uint64_t) ctx[j] * hp.ple_layer_multipliers[j];
-+                        }
-+                        const int64_t base = (n - 2) * per_gram;
-+                        for (int64_t g = 0; g < per_gram; ++g) {
-+                            const int64_t h_i = base + g;
-+                            idx[i * n_heads + h_i] =
-+                                (int32_t) (mixed % hp.ple_head_vocab_sizes[h_i] + hp.ple_head_offsets[h_i]);
-+                        }
++                    const int64_t base = (n - 2) * per_gram;
++                    for (int64_t g = 0; g < per_gram; ++g) {
++                        const int64_t h_i = base + g;
++                        idx[i * n_heads + h_i] =
++                            (int32_t) (mixed % hp.ple_head_vocab_sizes[h_i] + hp.ple_head_offsets[h_i]);
 +                    }
++                }
 +                }
 +            });
-+        }
-+        for (auto & w : workers) {
-+            w.join();
-+        }
-+    } else {
-+        for (int64_t i = 0; i < n_tokens; ++i) {
-+            int64_t ctx[16];
-+            ctx[0] = tok_of(i);
-+            bool cut = false;
-+            for (int64_t s = 1; s < n_gram; ++s) {
-+                const llama_token t = cut ? LLAMA_TOKEN_NULL : prev[i*n_prev + (n_prev - s)];
-+                cut = cut || t < 0 || t == eos;
-+                ctx[s] = cut ? eos : t;
-+            }
-+
-+            for (int64_t n = 2; n <= n_gram; ++n) {
-+                uint64_t mixed = (uint64_t) ctx[0] * hp.ple_layer_multipliers[0];
-+                for (int64_t j = 1; j < n; ++j) {
-+                    mixed ^= (uint64_t) ctx[j] * hp.ple_layer_multipliers[j];
-+                }
-+                const int64_t base = (n - 2) * per_gram;
-+                for (int64_t g = 0; g < per_gram; ++g) {
-+                    const int64_t h_i = base + g;
-+                    idx[i * n_heads + h_i] =
-+                        (int32_t) (mixed % hp.ple_head_vocab_sizes[h_i] + hp.ple_head_offsets[h_i]);
-+                }
-+            }
          }
 -
 -        for (int64_t n = 2; n <= n_gram; ++n) {
@@ -107,7 +76,32 @@ index c2ab9900e..b94b8f79e 100644
 -                idx[i * n_heads + h_i] =
 -                    (int32_t) (mixed % hp.ple_head_vocab_sizes[h_i] + hp.ple_head_offsets[h_i]);
 -            }
--        }
++        for (auto & w : workers) {
++            w.join();
++        }
++    } else {
++        // single-token decode stays single-threaded
++        for (int64_t i = 0; i < n_tokens; ++i) {
++                int64_t ctx[16];
++                ctx[0] = tok_of(i);
++                bool cut = false;
++                for (int64_t s = 1; s < n_gram; ++s) {
++                    const llama_token tok = cut ? LLAMA_TOKEN_NULL : prev[i*n_prev + (n_prev - s)];
++                    cut = cut || tok < 0 || tok == eos;
++                    ctx[s] = cut ? eos : tok;
++                }
++                for (int64_t n = 2; n <= n_gram; ++n) {
++                    uint64_t mixed = (uint64_t) ctx[0] * hp.ple_layer_multipliers[0];
++                    for (int64_t j = 1; j < n; ++j) {
++                        mixed ^= (uint64_t) ctx[j] * hp.ple_layer_multipliers[j];
++                    }
++                    const int64_t base = (n - 2) * per_gram;
++                    for (int64_t g = 0; g < per_gram; ++g) {
++                        const int64_t h_i = base + g;
++                        idx[i * n_heads + h_i] =
++                            (int32_t) (mixed % hp.ple_head_vocab_sizes[h_i] + hp.ple_head_offsets[h_i]);
++                    }
++                }
+         }
      }
  
-     ggml_backend_tensor_set(rows, idx.data(), 0, idx.size()*ggml_element_size(rows));

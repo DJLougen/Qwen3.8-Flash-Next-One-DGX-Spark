@@ -1,0 +1,28 @@
+[13:36:54] === arm t10-cold-4k-512 ctx=4096 ub=512 lazy=on prompt=ctx4096.txt timeout=300 evict=evict ===
+[13:36:54] evicting page cache (reading 120G of DeepSeek weights)
+               total        used        free      shared  buff/cache   available
+Mem:             121           8           7           0         111         112
+Swap:             15           0          15
+[13:37:20] MemAvailable 112G OK
+[13:37:20] samplers started (vmstat pid 1054802, iostat pid 1054803)
+[13:37:20] guard pid 1054811; server launching; load_t0=1788183440
+[13:39:07] health OK after 107 s (load_t0 -> health)
+[13:39:07] vmstat after-load snapshot taken
+[13:39:07] running benchmark
+run 1/1: ok ttft=11.038s total=13.615s tokens=64 decode_tps=24.448 e2e_tps=4.701
+aggregate: successful=1/1 ttft_median=11.038s decode_tps_median=24.448
+[13:39:21] benchmark rc=0
+[13:39:21] vmstat after-req snapshot taken
+[13:39:21] samplers killed
+[13:39:21] SIGTERM sent to guard 1054811
+[13:41:26] WARN llama-server still alive after 120 s
+[13:41:26] === summary t10-cold-4k-512 ===
+jsonl_rows 2
+row {"context_label": "t10-cold-4k-512"}
+row {"context_label": "t10-cold-4k-512"}
+guard_events 122
+min_mem_available_gib_during 47.44
+max_swap_growth_gib 0.227
+guard preflight child_exit_code None
+guard start child_exit_code None
+[13:41:26] === end t10-cold-4k-512 ===

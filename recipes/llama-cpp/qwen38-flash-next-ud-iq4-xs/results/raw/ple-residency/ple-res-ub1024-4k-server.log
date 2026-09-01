@@ -1,0 +1,24 @@
+0.00.398.793 I cmn  common_param: common_params_print_info: verbosity = 3 (adjust with the `-lv N` CLI arg)
+0.00.399.437 W srv  llama_server: -----------------
+0.00.399.440 W srv  llama_server: CORS is set to allow all origins ('*') and no API key is set
+0.00.399.440 W srv  llama_server: this can be a security risk (cross-origin attacks)
+0.00.399.441 W srv  llama_server: more info: https://github.com/ggml-org/llama.cpp/pull/25655
+0.00.399.441 W srv  llama_server: -----------------
+0.00.400.815 I srv    load_model: loading model '/home/djl/models/Qwen3.8-Flash-Next-UD-IQ4_XS/UD-IQ4_XS/Qwen3.8-Flash-Next-UD-IQ4_XS-00001-of-00003.gguf'
+0.01.082.948 W llama_model_loader: tensor overrides to CPU are used with mmap enabled - consider using --load-mode none for better performance
+2.00.715.266 I cmn          init: llama threadpool init, n_threads = 12
+2.01.017.636 I srv    load_model: initializing, n_slots = 1, n_ctx_slot = 4096, kv_unified = 'false'
+2.01.064.827 I srv          init: chat template supports preserving reasoning, consider enabling it via --reasoning-preserve
+2.01.066.134 I srv  llama_server: model loaded
+2.01.066.142 I srv  llama_server: listening on http://127.0.0.1:28900
+2.02.271.573 I slot get_availabl: id  0 | task -1 | selected slot by LRU, t_last = -1
+2.02.274.988 I slot launch_slot_: id  0 | task 0 | processing task, is_child = 0
+2.07.796.190 I slot print_timing: id  0 | task 0 | prompt processing, n_tokens =   2090, progress = 0.53, t =   5.52 s / 378.55 tokens per second
+2.09.917.844 I slot print_timing: id  0 | task 0 | prompt processing, n_tokens =   2927, progress = 0.74, t =   7.64 s / 382.98 tokens per second
+2.11.938.923 I slot print_timing: id  0 | task 0 | prompt processing, n_tokens =   3951, progress = 1.00, t =   9.66 s / 408.84 tokens per second
+2.14.613.044 I slot print_timing: id  0 | task 0 | prompt eval time =    9829.38 ms /  3955 tokens (    2.49 ms per token,   402.37 tokens per second)
+2.14.613.049 I slot print_timing: id  0 | task 0 |        eval time =    2508.16 ms /    64 tokens (   39.81 ms per token,    25.12 tokens per second)
+2.14.613.050 I slot print_timing: id  0 | task 0 |       total time =   12337.53 ms /  4019 tokens
+2.14.613.057 I slot print_timing: id  0 | task 0 |    graphs reused =         63
+2.14.617.064 I slot      release: id  0 | task 0 | stop processing: n_tokens = 4018, truncated = 0
+4.55.824.314 I srv    operator(): operator(): cleaning up before exit...

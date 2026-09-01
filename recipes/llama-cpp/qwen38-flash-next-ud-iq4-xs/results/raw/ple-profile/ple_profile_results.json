@@ -1,0 +1,44 @@
+{
+  "short": {
+    "n_tokens": 25,
+    "n_row_lookups": 400,
+    "n_unique_rows": 400,
+    "duplicate_rate": 0.0,
+    "hot_set_hit_rates": {
+      "top_1M": 1.0,
+      "top_5M": 1.0,
+      "top_10M": 1.0,
+      "top_25M": 1.0,
+      "top_50M": 1.0,
+      "top_100M": 1.0
+    }
+  },
+  "ctx4096": {
+    "n_tokens": 3904,
+    "n_row_lookups": 62464,
+    "n_unique_rows": 49556,
+    "duplicate_rate": 0.2066,
+    "hot_set_hit_rates": {
+      "top_1M": 1.0,
+      "top_5M": 1.0,
+      "top_10M": 1.0,
+      "top_25M": 1.0,
+      "top_50M": 1.0,
+      "top_100M": 1.0
+    }
+  },
+  "ctx65536": {
+    "n_tokens": 65344,
+    "n_row_lookups": 1045504,
+    "n_unique_rows": 459821,
+    "duplicate_rate": 0.5602,
+    "hot_set_hit_rates": {
+      "top_1M": 1.0,
+      "top_5M": 1.0,
+      "top_10M": 1.0,
+      "top_25M": 1.0,
+      "top_50M": 1.0,
+      "top_100M": 1.0
+    }
+  }
+}

@@ -1,0 +1,56 @@
+0.00.412.262 I cmn  common_param: common_params_print_info: verbosity = 3 (adjust with the `-lv N` CLI arg)
+0.00.412.909 W srv  llama_server: -----------------
+0.00.412.913 W srv  llama_server: CORS is set to allow all origins ('*') and no API key is set
+0.00.412.913 W srv  llama_server: this can be a security risk (cross-origin attacks)
+0.00.412.914 W srv  llama_server: more info: https://github.com/ggml-org/llama.cpp/pull/25655
+0.00.412.914 W srv  llama_server: -----------------
+0.00.414.278 I srv    load_model: loading model '/home/djl/models/Qwen3.8-Flash-Next-UD-IQ4_XS/UD-IQ4_XS/Qwen3.8-Flash-Next-UD-IQ4_XS-00001-of-00003.gguf'
+0.01.126.027 W llama_model_loader: tensor overrides to CPU are used with mmap enabled - consider using --load-mode none for better performance
+2.02.212.880 I cmn          init: llama threadpool init, n_threads = 12
+2.02.513.818 I srv    load_model: initializing, n_slots = 1, n_ctx_slot = 4096, kv_unified = 'false'
+2.02.531.996 I srv          init: chat template supports preserving reasoning, consider enabling it via --reasoning-preserve
+2.02.532.165 I srv  llama_server: model loaded
+2.02.532.171 I srv  llama_server: listening on http://127.0.0.1:28900
+2.03.495.837 I slot get_availabl: id  0 | task -1 | selected slot by LRU, t_last = -1
+2.03.497.195 I slot launch_slot_: id  0 | task 0 | processing task, is_child = 0
+2.09.199.256 I slot print_timing: id  0 | task 0 | n_gen =    100, tg =  25.19 t/s, tg_3s =  25.44 t/s
+2.10.339.454 I slot print_timing: id  0 | task 0 | prompt eval time =    1771.30 ms /   130 tokens (   13.63 ms per token,    73.39 tokens per second)
+2.10.339.461 I slot print_timing: id  0 | task 0 |        eval time =    5070.88 ms /   128 tokens (   39.93 ms per token,    25.04 tokens per second)
+2.10.339.462 I slot print_timing: id  0 | task 0 |       total time =    6842.18 ms /   258 tokens
+2.10.339.467 I slot print_timing: id  0 | task 0 |    graphs reused =        126
+2.10.355.845 I slot      release: id  0 | task 0 | stop processing: n_tokens = 257, truncated = 0
+2.10.363.542 I slot get_availabl: id  0 | task -1 | selected slot by LCP similarity, f_sim_best = 0.823 (> 0.100 thold), f_keep = 0.416
+2.10.539.721 I slot launch_slot_: id  0 | task 131 | processing task, is_child = 0
+2.14.779.457 I slot print_timing: id  0 | task 131 | n_gen =    100, tg =  26.34 t/s, tg_3s =  26.60 t/s
+2.15.912.958 I slot print_timing: id  0 | task 131 | prompt eval time =     480.65 ms /    88 tokens (    5.46 ms per token,   183.09 tokens per second)
+2.15.912.964 I slot print_timing: id  0 | task 131 |        eval time =    4892.53 ms /   128 tokens (   38.52 ms per token,    25.96 tokens per second)
+2.15.912.965 I slot print_timing: id  0 | task 131 |       total time =    5373.17 ms /   216 tokens
+2.15.912.967 I slot print_timing: id  0 | task 131 |    graphs reused =        251
+2.15.913.005 I slot      release: id  0 | task 131 | stop processing: n_tokens = 257, truncated = 0
+2.15.928.351 I slot get_availabl: id  0 | task -1 | selected slot by LCP similarity, f_sim_best = 0.823 (> 0.100 thold), f_keep = 0.416
+2.16.191.025 I slot launch_slot_: id  0 | task 261 | processing task, is_child = 0
+2.20.479.600 I slot print_timing: id  0 | task 261 | n_gen =    100, tg =  26.08 t/s, tg_3s =  26.34 t/s
+2.21.603.684 I slot print_timing: id  0 | task 261 | prompt eval time =     492.59 ms /    88 tokens (    5.60 ms per token,   178.65 tokens per second)
+2.21.603.691 I slot print_timing: id  0 | task 261 |        eval time =    4920.02 ms /   128 tokens (   38.74 ms per token,    25.81 tokens per second)
+2.21.603.692 I slot print_timing: id  0 | task 261 |       total time =    5412.61 ms /   216 tokens
+2.21.603.693 I slot print_timing: id  0 | task 261 |    graphs reused =        376
+2.21.603.723 I slot      release: id  0 | task 261 | stop processing: n_tokens = 257, truncated = 0
+2.21.612.335 I slot get_availabl: id  0 | task -1 | selected slot by LCP similarity, f_sim_best = 0.823 (> 0.100 thold), f_keep = 0.416
+2.21.859.331 I slot launch_slot_: id  0 | task 391 | processing task, is_child = 0
+2.26.098.328 I slot print_timing: id  0 | task 391 | n_gen =    100, tg =  26.46 t/s, tg_3s =  26.72 t/s
+2.27.179.426 I slot print_timing: id  0 | task 391 | prompt eval time =     497.04 ms /    88 tokens (    5.65 ms per token,   177.05 tokens per second)
+2.27.179.432 I slot print_timing: id  0 | task 391 |        eval time =    4823.01 ms /   128 tokens (   37.98 ms per token,    26.33 tokens per second)
+2.27.179.433 I slot print_timing: id  0 | task 391 |       total time =    5320.05 ms /   216 tokens
+2.27.179.435 I slot print_timing: id  0 | task 391 |    graphs reused =        501
+2.27.179.471 I slot      release: id  0 | task 391 | stop processing: n_tokens = 257, truncated = 0
+2.27.396.877 I slot get_availabl: id  0 | task -1 | selected slot by LRU, t_last = 246303820250
+2.27.629.641 I slot launch_slot_: id  0 | task 521 | processing task, is_child = 0
+2.30.858.580 I slot print_timing: id  0 | task 521 | prompt processing, n_tokens =   2048, progress = 0.53, t =   3.23 s / 634.28 tokens per second
+2.32.859.406 I slot print_timing: id  0 | task 521 | prompt processing, n_tokens =   3397, progress = 0.87, t =   5.23 s / 649.56 tokens per second
+2.33.746.311 I slot print_timing: id  0 | task 521 | prompt processing, n_tokens =   3909, progress = 1.00, t =   6.12 s / 639.08 tokens per second
+2.36.533.454 I slot print_timing: id  0 | task 521 | prompt eval time =    6238.12 ms /  3913 tokens (    1.59 ms per token,   627.27 tokens per second)
+2.36.533.464 I slot print_timing: id  0 | task 521 |        eval time =    2665.03 ms /    64 tokens (   42.30 ms per token,    23.64 tokens per second)
+2.36.533.465 I slot print_timing: id  0 | task 521 |       total time =    8903.15 ms /  3977 tokens
+2.36.533.897 I slot print_timing: id  0 | task 521 |    graphs reused =        563
+2.36.535.514 I slot      release: id  0 | task 521 | stop processing: n_tokens = 4018, truncated = 0
+2.36.579.751 I srv    operator(): operator(): cleaning up before exit...

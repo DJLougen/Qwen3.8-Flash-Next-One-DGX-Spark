@@ -1,0 +1,4 @@
+/tmp/instr3-main.log:2.07.482.263 I slot print_timing: id  0 | task 0 | prompt eval time =    9219.40 ms /  3955 tokens (    2.33 ms per token,   428.99 tokens per second)
+/tmp/instr3-main.log:2.07.482.274 I slot print_timing: id  0 | task 0 |    graphs reused =         63
+/tmp/instr-server.log:2.07.482.263 I slot print_timing: id  0 | task 0 | prompt eval time =    9219.40 ms /  3955 tokens (    2.33 ms per token,   428.99 tokens per second)
+/tmp/instr-server.log:2.07.482.274 I slot print_timing: id  0 | task 0 |    graphs reused =         63

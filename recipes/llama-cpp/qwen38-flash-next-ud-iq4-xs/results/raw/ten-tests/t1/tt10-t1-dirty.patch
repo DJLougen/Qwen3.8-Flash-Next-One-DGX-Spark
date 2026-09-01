@@ -1,0 +1,722 @@
+diff --git a/ggml/include/ggml.h b/ggml/include/ggml.h
+index 5f6774a63..d57878d24 100644
+--- a/ggml/include/ggml.h
++++ b/ggml/include/ggml.h
+@@ -1673,6 +1673,17 @@ extern "C" {
+             struct ggml_tensor  * a,  // data
+             struct ggml_tensor  * b); // row indices
+ 
++    // Like ggml_get_rows, but mean-pool every `r` gathered rows:
++    // b I32 [r * n_blocks, ne2, ne3, 1]
++    // return [n_embd, n_blocks, ne2, ne3]
++    GGML_API struct ggml_tensor * ggml_get_rows_mean(
++            struct ggml_context * ctx,
++            struct ggml_tensor  * a,
++            struct ggml_tensor  * b,
++            int                   r,
++            struct ggml_tensor  * w,   // optional RMS weight [ne00]; NULL = mean only
++            float                 eps);
++
+     GGML_API struct ggml_tensor * ggml_get_rows_back(
+             struct ggml_context * ctx,
+             struct ggml_tensor  * a,  // gradients of ggml_get_rows result
+diff --git a/ggml/src/ggml-cuda/lightning-indexer.cu b/ggml/src/ggml-cuda/lightning-indexer.cu
+index 5edc967e0..bd4924b96 100644
+--- a/ggml/src/ggml-cuda/lightning-indexer.cu
++++ b/ggml/src/ggml-cuda/lightning-indexer.cu
+@@ -15,7 +15,7 @@ typedef union {
+ #include <mma.h>
+ namespace wmma = nvcuda::wmma;
+ 
+-template <int WARPS_PER_BLOCK, int K_VECS_PER_BLOCK, int64_t N_EMBD, int64_t N_HEAD, ggml_type TYPE_K>
++template <int WARPS_PER_BLOCK, int K_VECS_PER_BLOCK, int64_t N_EMBD, int64_t N_HEAD, ggml_type TYPE_K, int N_HEAD_REAL = N_HEAD>
+ static __global__ void lightning_indexer_kernel_wmma(
+         const float * Q, const char * K, const float * W, const half * M, float * dst,
+         int64_t n_stream, int64_t n_batch, int64_t n_kv,
+@@ -32,6 +32,9 @@ static __global__ void lightning_indexer_kernel_wmma(
+     constexpr int K_EMBD_PER_INNER_LOOP = 16;
+     constexpr int N_EMBD_PADDED = N_EMBD + 8;
+ 
++    ggml_cuda_pdl_lc();
++    ggml_cuda_pdl_sync();
++
+     const int i_batch  = blockIdx.y;
+     const int i_stream = blockIdx.z;
+     const int i_warp   = threadIdx.y;
+@@ -49,8 +52,10 @@ static __global__ void lightning_indexer_kernel_wmma(
+     __shared__ float w_shared[N_HEAD];
+     __shared__ int2  q_shared_h[HEADS_PER_INNER_LOOP][N_EMBD_PADDED / 4];
+ 
+-    if (tid < N_HEAD) {
++    if (tid < N_HEAD_REAL) {
+         w_shared[tid] = w_base[tid];
++    } else if (tid < N_HEAD) {
++        w_shared[tid] = 0.0f;
+     }
+ 
+     // total number of half4 elements in HEADS_PER_INNER_LOOP x N_EMBD Q tile
+@@ -62,7 +67,10 @@ static __global__ void lightning_indexer_kernel_wmma(
+     for (int i_q = tid; i_q < N_Q_TILE; i_q += THREADS_PER_BLOCK) {
+         const int i_head = i_q / (N_EMBD / 4);
+         const int i_embd = i_q % (N_EMBD / 4);
+-        const float4 q = *(const float4 *) (q_base + i_head*nbq1 + i_embd*sizeof(float4));
++        float4 q = make_float4(0, 0, 0, 0);
++        if (i_head < N_HEAD_REAL) {
++            q = __ldg((const float4 *) (q_base + i_head*nbq1 + i_embd*sizeof(float4)));
++        }
+         half4 q_packed;
+         q_packed.h2[0] = __float22half2_rn(make_float2(q.x, q.y));
+         q_packed.h2[1] = __float22half2_rn(make_float2(q.z, q.w));
+@@ -83,7 +91,7 @@ static __global__ void lightning_indexer_kernel_wmma(
+             const int i_kv = start_kv + i_k_vec;
+             if (i_kv < n_kv) {
+                 const int2 * k_base = (const int2 *) ((const char *) K + i_kv*nbk2 + i_stream*nbk3);
+-                *(int2*) &k_shared_h[i_k_vec][i_embd] = k_base[i_embd];
++                *(int2*) &k_shared_h[i_k_vec][i_embd] = __ldg(&k_base[i_embd]);
+             } else {
+                 *(int2*) &k_shared_h[i_k_vec][i_embd] = make_int2(0, 0);
+             }
+@@ -135,7 +143,7 @@ static __global__ void lightning_indexer_kernel_wmma(
+             for (int i_q = tid, i_q_next = 0; i_q < N_Q_TILE; i_q += THREADS_PER_BLOCK) {
+                 const int i_head = i_head_next + i_q / (N_EMBD / 4);
+                 const int i_embd =               i_q % (N_EMBD / 4);
+-                q_next[i_q_next++] = *(const float4 *) (q_base + i_head*nbq1 + i_embd*sizeof(float4));
++                q_next[i_q_next++] = __ldg((const float4 *) (q_base + i_head*nbq1 + i_embd*sizeof(float4)));
+             }
+         }
+ 
+@@ -212,7 +220,7 @@ static __global__ void lightning_indexer_kernel_wmma(
+ 
+ #else // defined(TURING_MMA_AVAILABLE)
+ 
+-template <int WARPS_PER_BLOCK, int K_VECS_PER_BLOCK, int64_t N_EMBD, int64_t N_HEAD, ggml_type TYPE_K>
++template <int WARPS_PER_BLOCK, int K_VECS_PER_BLOCK, int64_t N_EMBD, int64_t N_HEAD, ggml_type TYPE_K, int N_HEAD_REAL = N_HEAD>
+ static __global__ void lightning_indexer_kernel_wmma(
+         const float * Q, const char * K, const float * W, const half * M, float * dst,
+         int64_t n_stream, int64_t n_batch, int64_t n_kv,
+@@ -255,6 +263,9 @@ static __global__ void lightning_indexer_kernel_vec(
+     constexpr int K_VECS_PER_WARP = K_VECS_PER_BLOCK / WARPS_PER_BLOCK;
+     constexpr int THREADS_PER_BLOCK = WARPS_PER_BLOCK * WARP_SIZE;
+ 
++    ggml_cuda_pdl_lc();
++    ggml_cuda_pdl_sync();
++
+     const int i_batch  = blockIdx.y;
+     const int i_stream = blockIdx.z;
+     const int i_warp   = threadIdx.y;
+@@ -279,7 +290,7 @@ static __global__ void lightning_indexer_kernel_vec(
+             int i_kv = start_kv + k;
+             if (i_kv < n_kv) {
+                 const float4 * k_base = (const float4 *) ((const char *) K + i_kv*nbk2 + i_stream*nbk3);
+-                k_reg_f[k] = k_base[i_lane];
++                k_reg_f[k] = __ldg(&k_base[i_lane]);
+             } else {
+                 k_reg_f[k] = make_float4(0, 0, 0, 0);
+             }
+@@ -528,6 +539,61 @@ void ggml_cuda_lightning_indexer(ggml_backend_cuda_context & ctx, ggml_tensor *
+             LIGHTNING_INDEXER_CASE(lightning_indexer_kernel_vec, 128, 32, k, GGML_TYPE_F32)
+             GGML_ABORT("fatal error");
+         }
++    } else if (n_embd == 128 && n_head == 8) {
++#if !defined(GGML_USE_HIP) && !defined(GGML_USE_MUSA)
++        if (GGML_CUDA_CC_IS_NVIDIA(cc) && turing_mma_available(cc) && k->type != GGML_TYPE_F32 && k->type != GGML_TYPE_BF16) {
++            constexpr int K_VECS_PER_BLOCK = 32;
++            constexpr int WARPS_PER_BLOCK = 8;
++            dim3 block(32, WARPS_PER_BLOCK);
++            int num_kv_blocks = (n_kv + (K_VECS_PER_BLOCK) - 1) / (K_VECS_PER_BLOCK);
++            dim3 grid(num_kv_blocks, n_batch, n_stream);
++            LIGHTNING_INDEXER_CASE(lightning_indexer_kernel_wmma, 128, 8, k, GGML_TYPE_F16)
++            LIGHTNING_INDEXER_CASE(lightning_indexer_kernel_wmma, 128, 8, k, GGML_TYPE_Q4_0)
++            LIGHTNING_INDEXER_CASE(lightning_indexer_kernel_wmma, 128, 8, k, GGML_TYPE_Q4_1)
++            LIGHTNING_INDEXER_CASE(lightning_indexer_kernel_wmma, 128, 8, k, GGML_TYPE_Q5_0)
++            LIGHTNING_INDEXER_CASE(lightning_indexer_kernel_wmma, 128, 8, k, GGML_TYPE_Q5_1)
++            LIGHTNING_INDEXER_CASE(lightning_indexer_kernel_wmma, 128, 8, k, GGML_TYPE_Q8_0)
++            GGML_ABORT("fatal error");
++        } else {
++#else
++        {
++#endif
++            constexpr int K_VECS_PER_WARP = 8;
++            constexpr int WARPS_PER_BLOCK = 8;
++            constexpr int K_VECS_PER_BLOCK = K_VECS_PER_WARP * WARPS_PER_BLOCK;
++            dim3 block(32, WARPS_PER_BLOCK);
++            int num_kv_blocks = (n_kv + (K_VECS_PER_BLOCK) - 1) / (K_VECS_PER_BLOCK);
++            dim3 grid(num_kv_blocks, n_batch, n_stream);
++            LIGHTNING_INDEXER_CASE(lightning_indexer_kernel_vec, 128, 8, k, GGML_TYPE_F16)
++            LIGHTNING_INDEXER_CASE(lightning_indexer_kernel_vec, 128, 8, k, GGML_TYPE_Q4_0)
++            LIGHTNING_INDEXER_CASE(lightning_indexer_kernel_vec, 128, 8, k, GGML_TYPE_Q4_1)
++            LIGHTNING_INDEXER_CASE(lightning_indexer_kernel_vec, 128, 8, k, GGML_TYPE_Q5_0)
++            LIGHTNING_INDEXER_CASE(lightning_indexer_kernel_vec, 128, 8, k, GGML_TYPE_Q5_1)
++            LIGHTNING_INDEXER_CASE(lightning_indexer_kernel_vec, 128, 8, k, GGML_TYPE_Q8_0)
++            LIGHTNING_INDEXER_CASE(lightning_indexer_kernel_vec, 128, 8, k, GGML_TYPE_BF16)
++            LIGHTNING_INDEXER_CASE(lightning_indexer_kernel_vec, 128, 8, k, GGML_TYPE_F32)
++            GGML_ABORT("fatal error");
++        }
++    } else if (n_embd == 128 && n_head == 4) {
++        {
++            constexpr int K_VECS_PER_WARP = 8;
++            constexpr int WARPS_PER_BLOCK = 8;
++            constexpr int K_VECS_PER_BLOCK = K_VECS_PER_WARP * WARPS_PER_BLOCK;
++
++            dim3 block(32, WARPS_PER_BLOCK);
++            int num_kv_blocks = (n_kv + (K_VECS_PER_BLOCK) - 1) / (K_VECS_PER_BLOCK);
++            dim3 grid(num_kv_blocks, n_batch, n_stream);
++
++            LIGHTNING_INDEXER_CASE(lightning_indexer_kernel_vec, 128, 4, k, GGML_TYPE_F16)
++            LIGHTNING_INDEXER_CASE(lightning_indexer_kernel_vec, 128, 4, k, GGML_TYPE_Q4_0)
++            LIGHTNING_INDEXER_CASE(lightning_indexer_kernel_vec, 128, 4, k, GGML_TYPE_Q5_0)
++            LIGHTNING_INDEXER_CASE(lightning_indexer_kernel_vec, 128, 4, k, GGML_TYPE_Q5_1)
++            LIGHTNING_INDEXER_CASE(lightning_indexer_kernel_vec, 128, 4, k, GGML_TYPE_Q8_0)
++            LIGHTNING_INDEXER_CASE(lightning_indexer_kernel_vec, 128, 4, k, GGML_TYPE_BF16)
++            LIGHTNING_INDEXER_CASE(lightning_indexer_kernel_vec, 128, 4, k, GGML_TYPE_F32)
++            LIGHTNING_INDEXER_CASE(lightning_indexer_kernel_vec, 128, 4, k, GGML_TYPE_Q4_1)
++            GGML_ABORT("fatal error");
++        }
+     } else {
+         GGML_ABORT("fatal error");
+     }
+@@ -556,7 +622,7 @@ bool ggml_cuda_lightning_indexer_supported(int device, const ggml_tensor * dst)
+         return false;
+     }
+ 
+-    if (neq1 != 64 && neq1 != 32) {
++    if (neq1 != 64 && neq1 != 32 && neq1 != 8 && neq1 != 4) {
+         return false;
+     }
+ 
+diff --git a/ggml/src/ggml.c b/ggml/src/ggml.c
+index e0b615c07..3607246ef 100644
+--- a/ggml/src/ggml.c
++++ b/ggml/src/ggml.c
+@@ -3911,6 +3911,37 @@ struct ggml_tensor * ggml_get_rows(
+     return result;
+ }
+ 
++struct ggml_tensor * ggml_get_rows_mean(
++        struct ggml_context * ctx,
++        struct ggml_tensor  * a,
++        struct ggml_tensor  * b,
++        int                   r,
++        struct ggml_tensor  * w,
++        float                 eps) {
++    GGML_ASSERT(r > 1);
++    GGML_ASSERT(b->ne[0] % r == 0);
++    GGML_ASSERT(a->ne[2] == b->ne[1]);
++    GGML_ASSERT(a->ne[3] == b->ne[2]);
++    GGML_ASSERT(b->ne[3] == 1);
++    GGML_ASSERT(b->type == GGML_TYPE_I32);
++    if (w) {
++        GGML_ASSERT(w->type == GGML_TYPE_F32);
++        GGML_ASSERT(w->ne[0] == a->ne[0]);
++        GGML_ASSERT(eps >= 0.0f);
++    }
++
++    struct ggml_tensor * result = ggml_new_tensor_4d(ctx, GGML_TYPE_F32, a->ne[0], b->ne[0] / r, b->ne[1], b->ne[2]);
++
++    result->op     = GGML_OP_GET_ROWS;
++    result->src[0] = a;
++    result->src[1] = b;
++    result->src[2] = w;
++    ggml_set_op_params_i32(result, 0, r);
++    ggml_set_op_params_f32(result, 1, eps);
++
++    return result;
++}
++
+ // ggml_get_rows_back
+ 
+ struct ggml_tensor * ggml_get_rows_back(
+diff --git a/src/llama-kv-cache.cpp b/src/llama-kv-cache.cpp
+index 10860c601..b08349690 100644
+--- a/src/llama-kv-cache.cpp
++++ b/src/llama-kv-cache.cpp
+@@ -1315,6 +1315,24 @@ ggml_tensor * llama_kv_cache::get_v(ggml_context * ctx, int32_t il, uint32_t n_k
+             ggml_row_size(v->type, kv_size*n_embd_v_gqa)*sinfo.s0);
+ }
+ 
++ggml_tensor * llama_kv_cache::get_v_ntrans(ggml_context * ctx, int32_t il, uint32_t n_kv, const slot_info & sinfo) const {
++    const int32_t ikv = map_layer_ids.at(il);
++
++    auto * v = layers[ikv].v;
++
++    const uint64_t kv_size      = get_size();
++    const uint64_t n_embd_v_gqa = hparams.n_embd_v_gqa(il);
++
++    const uint32_t ns = sinfo.s1 - sinfo.s0 + 1;
++
++    return ggml_view_4d(ctx, v,
++            hparams.n_embd_head_v(il), hparams.n_head_kv(il), n_kv, ns,
++            ggml_row_size(v->type, hparams.n_embd_head_v(il)),
++            ggml_row_size(v->type, n_embd_v_gqa),
++            ggml_row_size(v->type, n_embd_v_gqa*kv_size),
++            ggml_row_size(v->type, n_embd_v_gqa*kv_size)*sinfo.s0);
++}
++
+ ggml_tensor * llama_kv_cache::cpy_k(ggml_context * ctx, ggml_tensor * k_cur, ggml_tensor * k_idxs, int32_t il, const slot_info & sinfo) const {
+     GGML_UNUSED(sinfo);
+ 
+@@ -2749,6 +2767,10 @@ ggml_tensor * llama_kv_cache_context::get_v(ggml_context * ctx, int32_t il) cons
+     return kv->get_v(ctx, il, n_kv, sinfos[i_cur]);
+ }
+ 
++ggml_tensor * llama_kv_cache_context::get_v_ntrans(ggml_context * ctx, int32_t il) const {
++    return kv->get_v_ntrans(ctx, il, n_kv, sinfos[i_cur]);
++}
++
+ ggml_tensor * llama_kv_cache_context::cpy_k(ggml_context * ctx, ggml_tensor * k_cur, ggml_tensor * k_idxs, int32_t il) const {
+     return kv->cpy_k(ctx, k_cur, k_idxs, il, sinfos[i_cur]);
+ }
+diff --git a/src/llama-kv-cache.h b/src/llama-kv-cache.h
+index 2babbd1e9..061a9bd3b 100644
+--- a/src/llama-kv-cache.h
++++ b/src/llama-kv-cache.h
+@@ -188,6 +188,8 @@ public:
+     // get views of the current state of the cache
+     ggml_tensor * get_k(ggml_context * ctx, int32_t il, uint32_t n_kv, const slot_info & sinfo) const;
+     ggml_tensor * get_v(ggml_context * ctx, int32_t il, uint32_t n_kv, const slot_info & sinfo) const;
++    // K-style [head_dim, n_head_kv, n_kv, n_stream] view of V, ignoring v_trans.
++    ggml_tensor * get_v_ntrans(ggml_context * ctx, int32_t il, uint32_t n_kv, const slot_info & sinfo) const;
+ 
+     // store k_cur and v_cur in the cache based on the provided head location
+     ggml_tensor * cpy_k(ggml_context * ctx, ggml_tensor * k_cur, ggml_tensor * k_idxs, int32_t il, const slot_info & sinfo) const;
+@@ -394,6 +396,7 @@ public:
+     // get views of the current state of the cache
+     ggml_tensor * get_k(ggml_context * ctx, int32_t il) const;
+     ggml_tensor * get_v(ggml_context * ctx, int32_t il) const;
++    ggml_tensor * get_v_ntrans(ggml_context * ctx, int32_t il) const;
+ 
+     // store k_cur and v_cur in the cache based on the provided head location
+     // note: the heads in k_cur and v_cur should be laid out contiguously in memory
+diff --git a/src/llama-memory-hybrid-idx.cpp b/src/llama-memory-hybrid-idx.cpp
+index d4e59d77e..6bba7b7b4 100644
+--- a/src/llama-memory-hybrid-idx.cpp
++++ b/src/llama-memory-hybrid-idx.cpp
+@@ -4,6 +4,7 @@
+ #include "llama-batch.h"
+ #include "llama-io.h"
+ #include "llama-model.h"
++#include "ggml-cpp.h"
+ 
+ #include <algorithm>
+ #include <cassert>
+@@ -15,6 +16,16 @@
+ // llama_memory_hybrid_idx
+ //
+ 
++
++struct llama_memory_hybrid_idx::idx_pool {
++    ggml_context_ptr ctx;
++    ggml_backend_buffer_ptr buf;
++    std::map<int32_t, ggml_tensor *> k;
++    int64_t  n_blocks_max = 0;
++    int64_t  idx_dim = 0;
++    uint32_t n_stream = 1;
++};
++
+ llama_memory_hybrid_idx::llama_memory_hybrid_idx(
+         const llama_model & model,
+                             /* attn */
+@@ -56,7 +67,69 @@ llama_memory_hybrid_idx::llama_memory_hybrid_idx(
+             model, hparams_idx, type_k, type_v, v_trans, offload, unified,
+             kv_size, n_seq_max, n_pad, n_swa, swa_type,
+             nullptr, filter_idx, nullptr, nullptr, "idx_");
+-    }()) {}
++    }()) {
++    return; // inc_pool disabled: no pooled-K buffer
++    if (!mem_idx || filter_idx == nullptr) {
++        return;
++    }
++    uint32_t rmax = 1;
++    const uint32_t n_layer = model.hparams.n_layer_all;
++    int n_qsa = 0;
++    for (uint32_t il = 0; il < n_layer; ++il) {
++        if (!filter_idx(il)) {
++            continue;
++        }
++        const uint32_t r = model.hparams.dsv4_compress_ratios[il];
++        if (r == 0) {
++            continue;
++        }
++        rmax = std::max(rmax, r);
++        n_qsa++;
++    }
++    if (n_qsa == 0) {
++        return;
++    }
++    pool = std::make_unique<idx_pool>();
++    pool->idx_dim      = model.hparams.indexer_head_size;
++    pool->n_stream     = unified ? 1u : n_seq_max;
++    pool->n_blocks_max = (int64_t) ((kv_size + rmax - 1) / rmax);
++    ggml_init_params ip = {
++        /*.mem_size   =*/ size_t(2u * (n_qsa + 1) * ggml_tensor_overhead()),
++        /*.mem_buffer =*/ nullptr,
++        /*.no_alloc   =*/ true,
++    };
++    pool->ctx.reset(ggml_init(ip));
++    if (!pool->ctx) {
++        throw std::runtime_error("failed to create qsa pool context");
++    }
++    ggml_backend_buffer_type_t buft = ggml_backend_cpu_buffer_type();
++    if (offload) {
++        auto * dev = model.dev_layer(0);
++        if (dev) {
++            buft = ggml_backend_dev_buffer_type(dev);
++        }
++    }
++    for (uint32_t il = 0; il < n_layer; ++il) {
++        if (!filter_idx(il) || model.hparams.dsv4_compress_ratios[il] == 0) {
++            continue;
++        }
++        ggml_tensor * tk = ggml_new_tensor_3d(pool->ctx.get(), GGML_TYPE_F32,
++                pool->idx_dim, pool->n_blocks_max, pool->n_stream);
++        ggml_format_name(tk, "idx_pool_k_l%d", il);
++        pool->k[il] = tk;
++    }
++    ggml_backend_buffer_t buf = ggml_backend_alloc_ctx_tensors_from_buft(pool->ctx.get(), buft);
++    if (!buf) {
++        throw std::runtime_error("failed to allocate qsa pool buffer");
++    }
++    ggml_backend_buffer_clear(buf, 0);
++    pool->buf.reset(buf);
++    LLAMA_LOG_INFO("%s: QSA pooled-K cache = %8.2f MiB (%d layers, %ld blocks, dim %ld)\n",
++            __func__, ggml_backend_buffer_get_size(buf)/1024.0/1024.0,
++            n_qsa, (long) pool->n_blocks_max, (long) pool->idx_dim);
++}
++
++llama_memory_hybrid_idx::~llama_memory_hybrid_idx() = default;
+ 
+ llama_memory_context_ptr llama_memory_hybrid_idx::init_batch(llama_batch_allocr & balloc, uint32_t n_ubatch, bool embd_all) {
+     // note: repeats llama_memory_hybrid::init_batch, as the indexer needs the attention slot infos that the base context hides
+@@ -137,6 +210,9 @@ void llama_memory_hybrid_idx::clear(bool data) {
+     if (mem_idx) {
+         mem_idx->clear(data);
+     }
++    if (data && pool && pool->buf) {
++        ggml_backend_buffer_clear(pool->buf.get(), 0);
++    }
+ }
+ 
+ bool llama_memory_hybrid_idx::seq_rm(llama_seq_id seq_id, llama_pos p0, llama_pos p1) {
+@@ -261,6 +337,26 @@ llama_kv_cache * llama_memory_hybrid_idx::get_mem_idx() const {
+     return mem_idx.get();
+ }
+ 
++ggml_tensor * llama_memory_hybrid_idx::get_pool_k_storage(int32_t il) const {
++    if (!pool) {
++        return nullptr;
++    }
++    auto it = pool->k.find(il);
++    return it == pool->k.end() ? nullptr : it->second;
++}
++
++int64_t llama_memory_hybrid_idx::get_pool_n_blocks_max() const {
++    return pool ? pool->n_blocks_max : 0;
++}
++
++int64_t llama_memory_hybrid_idx::get_pool_idx_dim() const {
++    return pool ? pool->idx_dim : 0;
++}
++
++uint32_t llama_memory_hybrid_idx::get_pool_n_stream() const {
++    return pool ? pool->n_stream : 1;
++}
++
+ //
+ // llama_memory_hybrid_idx_context
+ //
+@@ -339,6 +435,29 @@ uint32_t llama_memory_hybrid_idx_context::get_n_stream() const {
+     return ns_ubatch[i_cur];
+ }
+ 
++ggml_tensor * llama_memory_hybrid_idx_context::get_pool_k(ggml_context * ctx, int32_t il, int64_t n_blocks) const {
++    ggml_tensor * stor = mem ? mem->get_pool_k_storage(il) : nullptr;
++    if (stor == nullptr) {
++        return nullptr;
++    }
++    return ggml_view_4d(ctx, stor,
++            stor->ne[0], 1, n_blocks, stor->ne[2],
++            stor->nb[1],
++            stor->nb[1],
++            stor->nb[2],
++            0);
++}
++
++ggml_tensor * llama_memory_hybrid_idx_context::cpy_pool_k(ggml_context * ctx, ggml_tensor * k_cur, ggml_tensor * idxs, int32_t il) const {
++    ggml_tensor * stor = mem ? mem->get_pool_k_storage(il) : nullptr;
++    if (stor == nullptr) {
++        return k_cur;
++    }
++    ggml_tensor * dst = ggml_reshape_2d(ctx, stor, stor->ne[0], stor->ne[1] * stor->ne[2]);
++    ggml_tensor * src = ggml_reshape_2d(ctx, k_cur, k_cur->ne[0], ggml_nrows(k_cur));
++    return ggml_set_rows(ctx, dst, src, idxs);
++}
++
+ void llama_memory_hybrid_idx_context::set_input_qsa(
+         ggml_tensor * cell_blk,
+         ggml_tensor * blk_cells,
+@@ -346,11 +465,17 @@ void llama_memory_hybrid_idx_context::set_input_qsa(
+         ggml_tensor * bias,
+         const llama_ubatch * ubatch,
+         uint32_t ratio,
+-        bool blk_bias) const {
++        bool blk_bias,
++        ggml_tensor * upd_blk,
++        ggml_tensor * pool_idxs) const {
+     GGML_ASSERT(ratio > 0);
+     GGML_ASSERT(mem != nullptr && mem->get_mem_idx() != nullptr);
+ 
+-    GGML_ASSERT(ggml_backend_buffer_is_host(cell_blk->buffer));
++    // Decode block-top-k does not consume cell_blk, so it may be unallocated.
++    const bool have_cell_blk = cell_blk && cell_blk->buffer;
++    if (have_cell_blk) {
++        GGML_ASSERT(ggml_backend_buffer_is_host(cell_blk->buffer));
++    }
+ 
+     const int64_t n_kv     = cell_blk->ne[0];
+     const int64_t n_ns     = cell_blk->ne[1];        // streams in this ubatch
+@@ -361,7 +486,7 @@ void llama_memory_hybrid_idx_context::set_input_qsa(
+     GGML_ASSERT(n_tokens % n_ns == 0);
+     const int64_t n_tps = n_tokens/n_ns;             // tokens per stream
+ 
+-    int32_t * dst_cell_blk  = (int32_t *) cell_blk->data;
++    int32_t * dst_cell_blk  = have_cell_blk ? (int32_t *) cell_blk->data : nullptr;
+     int32_t * dst_blk_cells = (int32_t *) blk_cells->data;
+     int32_t * dst_blk_pos   = (int32_t *) blk_pos->data;
+     float   * dst_bias      = (float   *) bias->data;
+@@ -385,7 +510,7 @@ void llama_memory_hybrid_idx_context::set_input_qsa(
+         const llama_seq_id seq_of_stream = ubatch->seq_id[s*n_tps][0];
+         const auto & cells = mem->get_mem_idx()->get_cells(seq_of_stream);
+ 
+-        int32_t * cur_cell_blk  = dst_cell_blk  + s*n_kv;
++        int32_t * cur_cell_blk  = dst_cell_blk ? dst_cell_blk + s*n_kv : nullptr;
+         int32_t * cur_blk_cells = dst_blk_cells + s*(r*n_blocks);
+ 
+         // an incomplete block cannot be pooled; the bias below forces those tail cells in
+@@ -424,7 +549,9 @@ void llama_memory_hybrid_idx_context::set_input_qsa(
+             if (blk_of[j] >= 0 && filled[blk_of[j]] < r && !blk_bias) {
+                 blk_of[j] = -1;
+             }
+-            cur_cell_blk[j] = blk_of[j] < 0 ? 0 : blk_of[j];
++            if (cur_cell_blk) {
++                cur_cell_blk[j] = blk_of[j] < 0 ? 0 : blk_of[j];
++            }
+         }
+ 
+         for (int64_t ii = 0; ii < n_tps; ++ii) {
+@@ -462,4 +589,20 @@ void llama_memory_hybrid_idx_context::set_input_qsa(
+             }
+         }
+     }
++
++    if (upd_blk && upd_blk->buffer) {
++        std::vector<int32_t> host((size_t) ggml_nelements(upd_blk), 0);
++        const int64_t n = std::min((int64_t) host.size(), n_tokens);
++        for (int64_t i = 0; i < n; ++i) {
++            host[i] = (int32_t) (ubatch->pos[i] / (llama_pos) r);
++        }
++        ggml_backend_tensor_set(upd_blk, host.data(), 0, host.size() * sizeof(int32_t));
++    }
++    if (pool_idxs && pool_idxs->buffer) {
++        std::vector<int32_t> host((size_t) pool_idxs->ne[0]);
++        for (int64_t bi = 0; bi < pool_idxs->ne[0]; ++bi) {
++            host[bi] = (int32_t) bi;
++        }
++        ggml_backend_tensor_set(pool_idxs, host.data(), 0, host.size() * sizeof(int32_t));
++    }
+ }
+diff --git a/src/llama-memory-hybrid-idx.h b/src/llama-memory-hybrid-idx.h
+index e3472646d..26ea3a25c 100644
+--- a/src/llama-memory-hybrid-idx.h
++++ b/src/llama-memory-hybrid-idx.h
+@@ -39,7 +39,7 @@ public:
+                             /* the indexer cache exists only if this is given */
+     const layer_filter_cb & filter_idx);
+ 
+-    ~llama_memory_hybrid_idx() = default;
++    ~llama_memory_hybrid_idx();
+ 
+     //
+     // llama_memory_i
+@@ -75,7 +75,13 @@ public:
+ 
+     llama_kv_cache * get_mem_idx() const;   // nullptr when the model carries no indexer
+ 
++    ggml_tensor * get_pool_k_storage(int32_t il) const;
++    int64_t       get_pool_n_blocks_max() const;
++    int64_t       get_pool_idx_dim() const;
++    uint32_t      get_pool_n_stream() const;
++
+ private:
++    struct idx_pool;
+     // forget seq_id (all of it if seq_id < 0) in every cache at once, so a failed restore cannot leave the caches out of step
+     // seq_id < 0 drops the whole context, as the caches themselves do on a failed restore
+     void state_drop(llama_seq_id seq_id);
+@@ -85,6 +91,7 @@ private:
+     llama_hparams hparams_idx;
+ 
+     const std::unique_ptr<llama_kv_cache> mem_idx;
++    std::unique_ptr<idx_pool> pool;
+ };
+ 
+ class llama_memory_hybrid_idx_context : public llama_memory_hybrid_context {
+@@ -139,7 +146,11 @@ public:
+     // the caller then adds the attention mask, the only part of the bias that varies within a block
+     void set_input_qsa(ggml_tensor * cell_blk, ggml_tensor * blk_cells, ggml_tensor * blk_pos,
+                        ggml_tensor * bias, const llama_ubatch * ubatch, uint32_t ratio,
+-                       bool blk_bias) const;
++                       bool blk_bias, ggml_tensor * upd_blk = nullptr,
++                       ggml_tensor * pool_idxs = nullptr) const;
++
++    ggml_tensor * get_pool_k(ggml_context * ctx, int32_t il, int64_t n_blocks) const;
++    ggml_tensor * cpy_pool_k(ggml_context * ctx, ggml_tensor * k_cur, ggml_tensor * idxs, int32_t il) const;
+ 
+ private:
+     const llama_memory_hybrid_idx * mem = nullptr;
+diff --git a/src/models/qwen4exp.cpp b/src/models/qwen4exp.cpp
+index c2ab9900e..5fa1d75b5 100644
+--- a/src/models/qwen4exp.cpp
++++ b/src/models/qwen4exp.cpp
+@@ -1,3 +1,4 @@
++#include <thread>
+ #include "models.h"
+ #include "llama-impl.h"
+ #include "llama-memory-hybrid-idx.h"
+@@ -397,6 +398,26 @@ public:
+         mctx->get_idx()->set_input_k_idxs(k_idxs, ubatch);
+         mctx->set_input_qsa(cell_blk, blk_cells, blk_pos, bias, ubatch, ratio, blk_bias);
+     }
++    // reuse when all input tensors would be recreated with identical shapes
++    // (decode steps inside one n_kv pad bucket; a bucket crossing rebuilds, like the dense path)
++    bool can_reuse(const llm_graph_params & params) override {
++        // refresh the per-batch memory context: the stored one belongs to a destroyed batch
++        mctx = static_cast<const llama_memory_hybrid_idx_context *>(params.mctx);
++        const auto * mctx_hyb = mctx;
++        const llama_kv_cache_context * mctx_idx = mctx_hyb->get_idx();
++        const auto & ubatch = params.ubatch;
++        const int64_t n_kv     = mctx_idx->get_n_kv();
++        const int64_t n_stream = mctx_hyb->get_n_stream();
++        const int64_t n_blocks = (n_kv + ratio - 1)/ratio;
++        const int64_t n_tps    = ubatch.n_tokens/n_stream;
++        bool res = true;
++        res &= k_idxs->ne[0]    == ubatch.n_tokens;
++        res &= cell_blk->ne[0]  == n_kv && cell_blk->ne[1]  == n_stream;
++        res &= blk_cells->ne[0] == (int64_t) ratio*n_blocks && blk_cells->ne[1] == n_stream;
++        res &= blk_pos->ne[0]   == 4*n_blocks*n_stream;
++        res &= bias->ne[0]      == (blk_bias ? n_blocks : n_kv) && bias->ne[1] == n_tps && bias->ne[2] == n_stream;
++        return res;
++    }
+ 
+     // per stream: a cell index names a different token in each stream
+     ggml_tensor * k_idxs    = nullptr;   // I32 [n_tokens]
+@@ -903,6 +924,13 @@ public:
+ 
+     void set_input(const llama_ubatch * ubatch) override;
+ 
++    // rows is [ple_n_heads * n_tokens]; identical ubatch geometry means identical shapes
++    bool can_reuse(const llm_graph_params & params) override {
++        // refresh the per-batch cache context before any reuse (mirrors attn_kv::can_reuse)
++        mctx = static_cast<const llama_memory_hybrid_idx_context *>(params.mctx)->get_attn();
++        return rows->ne[0] == (int64_t) pmodel.hparams.ple_n_heads * params.ubatch.n_tokens;
++    }
++
+     ggml_tensor * rows = nullptr;   // I32 [ple_n_heads * n_tokens]
+ 
+     const llama_model_qwen4exp & pmodel;
+@@ -937,6 +965,7 @@ void llm_graph_input_ple::set_input(const llama_ubatch * ubatch) {
+     std::vector<int32_t> idx(n_heads * n_tokens);
+ 
+     GGML_ASSERT(mctx != nullptr);
++    GGML_ASSERT(n_gram <= 16);
+ 
+     for (int64_t i = 0; i < n_tokens; ++i) {
+         // the preceding tokens would be ambiguous, see get_prev_tokens()
+@@ -946,31 +975,65 @@ void llm_graph_input_ple::set_input(const llama_ubatch * ubatch) {
+     // predecessors come from the KV cells (ext.tok); apply_ubatch() already stored this ubatch, so its own tokens count too
+     mctx->get_prev_tokens(*ubatch, n_prev, prev);
+ 
+-    for (int64_t i = 0; i < n_tokens; ++i) {
+-        // an EOS in the window resets everything at or before it
+-        // a missing predecessor (before the sequence start, or no cached cell) reads as EOS
+-        // the EOS of the token itself does not cut its own context, as in the reference
+-        std::vector<int64_t> ctx(n_gram);
+-        ctx[0] = tok_of(i);
+-        bool cut = false;
+-        for (int64_t s = 1; s < n_gram; ++s) {
+-            // predecessor s positions back; prev[] is oldest-first, missing entries are LLAMA_TOKEN_NULL
+-            const llama_token t = cut ? LLAMA_TOKEN_NULL : prev[i*n_prev + (n_prev - s)];
+-            cut = cut || t < 0 || t == eos;
+-            ctx[s] = cut ? eos : t;
++    if (n_tokens > 1) {
++        // prefill ubatch: partition tokens across workers (exact-output hash preserved)
++        const int n_threads = std::min<int>(12, (int) n_tokens);
++        std::vector<std::thread> workers;
++        workers.reserve(n_threads);
++        for (int t = 0; t < n_threads; ++t) {
++            workers.emplace_back([&, t]() {
++                const int64_t i_start = (n_tokens * t) / n_threads;
++                const int64_t i_end   = (n_tokens * (t + 1)) / n_threads;
++                for (int64_t i = i_start; i < i_end; ++i) {
++                int64_t ctx[16];
++                ctx[0] = tok_of(i);
++                bool cut = false;
++                for (int64_t s = 1; s < n_gram; ++s) {
++                    const llama_token tok = cut ? LLAMA_TOKEN_NULL : prev[i*n_prev + (n_prev - s)];
++                    cut = cut || tok < 0 || tok == eos;
++                    ctx[s] = cut ? eos : tok;
++                }
++                for (int64_t n = 2; n <= n_gram; ++n) {
++                    uint64_t mixed = (uint64_t) ctx[0] * hp.ple_layer_multipliers[0];
++                    for (int64_t j = 1; j < n; ++j) {
++                        mixed ^= (uint64_t) ctx[j] * hp.ple_layer_multipliers[j];
++                    }
++                    const int64_t base = (n - 2) * per_gram;
++                    for (int64_t g = 0; g < per_gram; ++g) {
++                        const int64_t h_i = base + g;
++                        idx[i * n_heads + h_i] =
++                            (int32_t) (mixed % hp.ple_head_vocab_sizes[h_i] + hp.ple_head_offsets[h_i]);
++                    }
++                }
++                }
++            });
+         }
+-
+-        for (int64_t n = 2; n <= n_gram; ++n) {
+-            uint64_t mixed = (uint64_t) ctx[0] * hp.ple_layer_multipliers[0];
+-            for (int64_t j = 1; j < n; ++j) {
+-                mixed ^= (uint64_t) ctx[j] * hp.ple_layer_multipliers[j];
+-            }
+-            const int64_t base = (n - 2) * per_gram;
+-            for (int64_t g = 0; g < per_gram; ++g) {
+-                const int64_t h_i = base + g;
+-                idx[i * n_heads + h_i] =
+-                    (int32_t) (mixed % hp.ple_head_vocab_sizes[h_i] + hp.ple_head_offsets[h_i]);
+-            }
++        for (auto & w : workers) {
++            w.join();
++        }
++    } else {
++        // single-token decode stays single-threaded
++        for (int64_t i = 0; i < n_tokens; ++i) {
++                int64_t ctx[16];
++                ctx[0] = tok_of(i);
++                bool cut = false;
++                for (int64_t s = 1; s < n_gram; ++s) {
++                    const llama_token tok = cut ? LLAMA_TOKEN_NULL : prev[i*n_prev + (n_prev - s)];
++                    cut = cut || tok < 0 || tok == eos;
++                    ctx[s] = cut ? eos : tok;
++                }
++                for (int64_t n = 2; n <= n_gram; ++n) {
++                    uint64_t mixed = (uint64_t) ctx[0] * hp.ple_layer_multipliers[0];
++                    for (int64_t j = 1; j < n; ++j) {
++                        mixed ^= (uint64_t) ctx[j] * hp.ple_layer_multipliers[j];
++                    }
++                    const int64_t base = (n - 2) * per_gram;
++                    for (int64_t g = 0; g < per_gram; ++g) {
++                        const int64_t h_i = base + g;
++                        idx[i * n_heads + h_i] =
++                            (int32_t) (mixed % hp.ple_head_vocab_sizes[h_i] + hp.ple_head_offsets[h_i]);
++                    }
++                }
+         }
+     }
+ 

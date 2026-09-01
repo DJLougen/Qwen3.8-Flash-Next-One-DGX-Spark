@@ -1,0 +1,16 @@
+0.00.396.216 I cmn  common_param: common_params_print_info: verbosity = 3 (adjust with the `-lv N` CLI arg)
+0.00.399.481 W srv  llama_server: -----------------
+0.00.399.489 W srv  llama_server: CORS is set to allow all origins ('*') and no API key is set
+0.00.399.489 W srv  llama_server: this can be a security risk (cross-origin attacks)
+0.00.399.489 W srv  llama_server: more info: https://github.com/ggml-org/llama.cpp/pull/25655
+0.00.399.490 W srv  llama_server: -----------------
+0.00.400.985 I srv    load_model: loading model '/home/djl/models/Qwen3.8-Flash-Next-UD-IQ4_XS/UD-IQ4_XS/Qwen3.8-Flash-Next-UD-IQ4_XS-00001-of-00003.gguf'
+0.01.086.825 W llama_model_loader: tensor overrides to CPU are used with mmap enabled - consider using --load-mode none for better performance
+1.35.797.666 I cmn          init: llama threadpool init, n_threads = 12
+1.35.977.700 I common_speculative_init_result: loading draft model '/home/djl/models/Qwen3.8-Flash-Next-UD-IQ4_XS/mtp-Qwen3.8-Flash-Next-FP8-Q8_0.gguf'
+1.36.718.438 E llama_model_load: error loading model: check_tensor_dims: tensor 'blk.0.hc_attn_norm.weight' not found
+1.36.718.631 E llama_model_load_from_file_impl: failed to load model
+1.36.718.634 E common_speculative_init_result: failed to load draft model, '/home/djl/models/Qwen3.8-Flash-Next-UD-IQ4_XS/mtp-Qwen3.8-Flash-Next-FP8-Q8_0.gguf'
+1.36.718.643 E srv    load_model: failed to load draft model, '/home/djl/models/Qwen3.8-Flash-Next-UD-IQ4_XS/mtp-Qwen3.8-Flash-Next-FP8-Q8_0.gguf'
+1.36.718.651 I srv    operator(): operator(): cleaning up before exit...
+1.36.724.986 E srv  llama_server: exiting due to model loading error

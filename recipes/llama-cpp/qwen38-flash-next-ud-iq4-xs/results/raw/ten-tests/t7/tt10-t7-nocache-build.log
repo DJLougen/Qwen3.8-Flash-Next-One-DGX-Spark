@@ -1,0 +1,4 @@
+[ 50%] Built target ggml-base
+[ 50%] Building CXX object ggml/src/CMakeFiles/ggml-cpu.dir/ggml-cpu/ops.cpp.o
+[ 50%] Linking CXX shared library ../../bin/libggml-cpu.so
+[100%] Built target ggml-cpu

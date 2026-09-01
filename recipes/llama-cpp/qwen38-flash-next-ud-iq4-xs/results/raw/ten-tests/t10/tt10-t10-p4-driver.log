@@ -1,0 +1,6 @@
+warmup 1/1: ok ttft=9.773s total=12.435s tokens=64 decode_tps=23.666 e2e_tps=5.147
+run 1/3: ok ttft=0.187s total=2.541s tokens=64 decode_tps=26.758 e2e_tps=25.188
+run 2/3: ok ttft=0.178s total=2.531s tokens=64 decode_tps=26.769 e2e_tps=25.285
+run 3/3: ok ttft=0.178s total=2.540s tokens=64 decode_tps=26.674 e2e_tps=25.201
+aggregate: successful=3/3 ttft_median=0.178s decode_tps_median=26.758
+done t10-pool4

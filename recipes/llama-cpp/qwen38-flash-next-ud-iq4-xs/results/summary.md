@@ -76,7 +76,8 @@ server after load).
 | `-ub 512` (default) | 28.60 tok/s | 0.149 s | 12.65 s | 318.1 tok/s | 25.01 tok/s |
 | `-ub 1024` | **28.74 tok/s** | 0.152 s | **8.22 s** | **481.3 tok/s** | **25.18 tok/s** |
 
-`-ub 1024` yields a **35% reduction in cold 4k TTFT** (8.22 s vs 12.65 s) by lifting prompt prefill from ~318 to **~481 tok/s** on GB10, while keeping short decode at **~28.7 tok/s**. Evidence: `raw/ubatch-sweep/`.
+`-ub 1024` yields a **35% reduction in cold 4k TTFT** (8.22 s vs 12.65 s) by lifting prompt prefill from ~318 to **~481 tok/s** on GB10, while keeping short decode at **~28.7 tok/s**. Evidence: `raw/ubatch-sweep/`. **Caveat (2026-08-30):** the clean-tree revalidation (`raw/ple-residency/`) stopped at the pre-decided hash gate — at `-ub 1024` the 4k output hash is `06124a4b`, not the `-ub 512`-era reference `99a15d5b` (ubatch-split numerics divergence, not binary drift — the same binary matched `99a15d5b`/`b641e2eb` at `-ub 512` minutes earlier). The 8.22 s figure therefore stays an era-2026-08-29 result, not a clean-tree validated one; establish a per-ubatch hash baseline before reusing the digest as a cross-ubatch control gate.
+
 
 ### Deep-context microbatch scaling (`-ub 1024` at 64k / 128k)
 
@@ -88,7 +89,39 @@ Measured 2026-08-29 on fresh unpatched servers per depth with per-depth context 
 | 65,536 | 65,395 | 162.46 s | 404.18 tok/s | **163.53 s** | **~400 tok/s** | 19.96 tok/s | +0.7% | -1.0% |
 | 131,072 | 130,931 | 538.32 s* | ~243 tok/s* | **386.77 s** | **339.47 tok/s** | 16.32 tok/s | **-28.1%** | **+39.7%** |
 
-\*128k comparison point from the 2026-08-27 `b512`/`ub128` baseline sweep (538.32 s TTFT / 8.16 tok/s decode). At 64k, TTFT is essentially flat (+0.7%) as PLE memory/IO bottlenecks dominate over chunk launch batching. At 128k, `-ub 1024` cuts TTFT by 151.6 s (**28.1% reduction**) and lifts prefill from ~243 to **339.5 tok/s**. Evidence: `raw/deep-ub1024/`.
+\*128k comparison point from the 2026-08-27 `b512`/`ub128` baseline sweep (538.32 s TTFT / 8.16 tok/s decode). At 64k, TTFT is essentially flat (+0.7%) as PLE memory/IO bottlenecks dominate over chunk launch batching. At 128k, `-ub 1024` cuts TTFT by 151.6 s (**28.1% reduction**) and lifts prefill from ~243 to **339.5 tok/s**. Evidence: `raw/deep-ub1024/`. Subject to the same 2026-08-30 hash-gate caveat above.
+
+### PLE residency Gate 0 — cold-prefill disk reads (2026-08-30, lazy on)
+
+True-cold arms (120 GiB page-cache eviction before each load; verified by ~51 GiB load-window `pgpgin`), request-window disk reads by three estimators:
+
+| Depth | vmstat `bi` | iostat `rkB/s` | pgpgin | pgmajfault | Hash |
+|---:|---:|---:|---:|---:|---|
+| 4k | 443 MB | 443 MB | 405 MB | 55,669 | `99a15d5b` ✓ |
+| 64k | 1,098 MB | 1,085 MB | 2,152 MB | 458,895 | `b641e2eb` ✓ |
+
+Both depths clear the pre-decided 100/500 MB materiality gates: Grok's disk-bound cold prefill **reproduces on GB10** — the lazy PLE table demand-faults a material fraction of its amplified unique-row set from NVMe during prefill (4k TTFT 10.79 s / 372.5 tok/s; 64k 170.7 s / 384.7 tok/s; guard floors held, min ≥ 43 GiB). The `--tensor-read-lazy off` / surgical-PLE-populate A/B (Step 3) was originally halted by Step 2's hash gate — **the Step 3 reopen (below) has since run and closed the axis**. Evidence: `raw/ple-residency/`.
+
+### PLE residency Step 3 reopen — `--tensor-read-lazy off` A/B (2026-08-30, `no-win`)
+
+True-cold A/B at both depths, flags identical to Gate 0 except `--tensor-read-lazy off` (whole-GGUF `MAP_POPULATE` at load — load-window reads 87.5/117.8 GB, load→health +31–70 s). Outputs byte-identical (`99a15d5b`/`b641e2eb`), guard floors held (min 47.26/46.05 GiB, swap ≤ 0.23 GiB, no hard kill):
+
+| Arm | TTFT | vs Gate 0 | prompt-eval | request-window reads (bi / rkB/s / pgpgin) |
+|---|---:|---:|---:|---|
+| `lazyoff-4k` | 22.674 s | **+110%** | 176.0 tok/s (was 372.5) | **~10.2 GB** all three (was 0.40–0.44 GB) |
+| `lazyoff-64k` | 168.323 s | −1.4% (sub-gate) | 390.2 tok/s (was 384.7) | **~21.9 GB** all three (was 1.1–2.2 GB) |
+
+**Verdict `no-win` — axis closed.** MAP_POPULATE populated the GGUF at load, but GB10
+unified-memory reclaim evicted the clean mapped file pages once the request's
+KV/activation working set landed, so prefill re-faulted the weights from NVMe at **25×
+(4k) / 10× (64k)** the lazy-on disk traffic — 4k TTFT doubled. Lazy-on +
+`POSIX_MADV_RANDOM` (fault only accessed PLE rows) is the correct design on this host;
+whole-file populate must not be pursued (mlock out of scope). Step 2' (`-ub 1024`
+revival) and the composition run were not run — gated on a 4k Step 3 win, which did not
+occur — so the 2026-08-29 `8.22 s / 481 tok/s` `-ub 1024` figures **remain
+era-2026-08-29** (per-ubatch hash baseline `06124a4b` established, but the revival arm
+was never needed). Evidence: `raw/ple-residency/`.
+
 ## Context allocation sweep with a short prompt
 
 These rows measure the cost of allocating a larger context while processing the same 76-token prompt. They do **not** represent decode at that depth.
@@ -315,6 +348,38 @@ Remaining untested directions, in the same safety order: fix whole-file
 multithreaded `GET_ROWS` for large prefill gathers; page-sorted/deduplicated
 row gathers. Explicit I/O, hot-row caches, and layout/quant redesign stay last.
 
+
+### nsys profile of cold 4k prefill — decision experiment (2026-08-30)
+
+Full nsys attribution of the **11.785 s** cold 4k prompt eval (PLE-MT build,
+`llama-server.ple-mt`, `-b 2048 -ub 512`) over the exact request window:
+GPU kernel busy **4.545 s (38.5%)**; **6.62 s (56.1%)** in 13 CPU-side idle gaps
+with zero CUDA activity between ubatch bursts; H2D of gathered PLE activations
+**7 ms (0.06%)**. Neither optimization branch fires: fused gated residual
+(needs GPU >70%, measured 38.5%; elementwise chains are ~9% of TTFT) and
+zero-copy PLE (needs PLE gather+H2D >15%, measured ~0.1%) are both **not
+indicated**. The dominant cost is per-ubatch CPU serialization from broken
+CUDA-graph reuse: the QSA patch tree reports `graphs reused = 0` (rebuild
+every ubatch) vs `graphs reused = 7` on unpatched `250b61446` (prompt eval
+10.381 s at identical flags). Page-cache warmth accounts for only ~1.3 s of
+the gap total (shuffled same-length prompt on a warm server: 8.636 s vs
+9.969 s cold). New prioritized axis: QSA-native CUDA-graph-reuse fix.
+Evidence: `raw/nsys-4k/`.
+
+### QSA graph-reuse fix — `can_reuse` overrides (2026-08-30)
+
+Added `can_reuse` shape-stability overrides to `llm_graph_input_qsa` and
+`llm_graph_input_ple` (they inherited the unconditional-false base default, so
+every ubatch on this arch rebuilt the compute graph: `graphs reused = 0`). The
+overrides also refresh the per-batch `mctx` before reuse — without it the first
+reused step dereferences a destroyed batch's memory context (GDB-captured SIGSEGV;
+this and the missing shape checks explain the earlier hard-rejected 0xBakeer
+patch's crash). Verified: short hash `cb7904d8` exact; repeat identical request
+survives (0xBakeer scenario) at 28.5 tok/s; `graphs reused = 127` per 128-token
+decode; **decode ~38.4-41.5 ms/tok vs 43.4-45.2 control (~10-12% faster)**; 4k
+output byte-identical to the no-override control. Prefill unchanged by design
+(padded n_kv growth correctly forces rebuild each ubatch). Evidence:
+`raw/graph-reuse/`, patch `patches/qwen4exp-can-reuse.patch`.
 ## Parked post-gap work (not implemented)
 
 Documented from the 2026-08-29 TTFT-gap plan; **not shipped** in this recipe:
@@ -372,6 +437,52 @@ Research clone: `0xBakeer/qwen38-flash-next-spark` commit `4c6fc3af429bff5c47251
 
 The comparison repository is MIT licensed, Copyright (c) 2026 0xBakeer. Its methodology informed the varied task suite and rejected graph-reuse experiment; no third-party code is shipped here.
 
+## Ten optimization tests (2026-08-30/31)
+
+Campaign after the PLE-residency axis closed (`no-win`, commit `ee73c38`). Full
+table and per-patch ANALYSIS under [`raw/ten-tests/`](raw/ten-tests/). Headline:
+
+| Test | Verdict | Headline |
+|---|---|---|
+| T1 GET_ROWS `n_tasks = n_threads` | **win (prefill)** / decode −6.8% | 4k TTFT **6.806 s** (−37% vs 10.791), hash `99a15d5b` exact |
+| T2 PLE `posix_madvise(WILLNEED)` | rejected | request-window reads unchanged (410 / 2018 MB) |
+| T3 `-ub 1024` revival | **win** | 4k **9.199 s** (`06124a4b`); 64k 160.99 s (`a81283e2`) |
+| T4 KV `q8_0` at 262k | **enabling win** | f16 262k guard-breach (35.77 GiB); q8_0 runs (37.97 GiB, 901.65 s) |
+| T5 can-reuse × MTP | no-win | 26.54 tok/s vs 40.5 MTP-alone; main-tree draft load failed |
+| T6 spec-on varied tasks | **release row** | +10–45% decode vs spec-off; accept 78.3% |
+| T7 PLE row cache in `get_rows_q` | rejected | CPU `get_rows_q` never runs; PLE gather is CUDA |
+| T8 mixed-lane `-np 2` | gate-fail | decode lane 12.87 tok/s < 15 (`--no-cache-prompt`) |
+| T9 kmtp QSA×can-reuse | **integration proven** | 4k hash `c64973d8` byte-stable; 64k 20.44 tok/s; 230k 12.94 tok/s |
+| T10 `PLE_MT_THREADS` at ub1024 | no-win | best warm-first 9.156 s (pool 6); cold 10.793 s |
+
+T1 is the largest prefill move since PLE-MT. T7 showed it is **not** the PLE
+IQ4_NL dequant loop (that is CUDA `getrows.cu`) — it is the remaining CPU
+GET_ROWS sites. Short-hash `cb7904d8` held on T1 and T10.
+
+By context length (true-cold unless noted):
+
+| Ctx | Config | TTFT (s) | Prefill tok/s | Decode tok/s | Hash | Guard min GiB |
+|---|---|---:|---:|---:|---|---:|
+| ~76 (warm) | Gate 0 ub512 | 0.149 | — | 28.6 | `cb7904d8` | — |
+| ~76 (warm) | T1 GET_ROWS | 0.144 | — | 26.66 | `cb7904d8` | — |
+| ~76 (warm) | T5 kmtp+MTP | 0.322 | — | 26.54 | — | — |
+| **4k** | Gate 0 ub512 | 10.791 | 372.5 | 24.6 | `99a15d5b` | — |
+| **4k** | T1 GET_ROWS ub512 | **6.806** | **599.9** | 23.42 | `99a15d5b` | 50.86 |
+| **4k** | T3 ub1024 | **9.199** | 438.9 | 23.79 | `06124a4b` | — |
+| **4k** | T9 kmtp ub512 | 12.011 | 335.0 | 24.95 | `c64973d8` | 50.86 |
+| **64k** | Gate 0 ub512 | 170.663 | 384.7 | 14.5 | `b641e2eb` | — |
+| **64k** | T1 GET_ROWS ub512 | **131.94** | **498.1** | 13.96 | `b641e2eb` | — |
+| **64k** | T3 ub1024 | **160.99** | 408.4 | 14.35 | `a81283e2` | — |
+| **64k** | T9 kmtp ub512 | 166.57 | 393.9 | **20.44** | `b0ea9f23` | 47.71 |
+| **128k** | era f16 ub1024 | 386.77 | 339.5 | — | — | — |
+| **128k** | T4 kvq8 ub1024 | 397.5 | 330.4 | 9.78 | `9b622db0` | 44.2 |
+| **230k / 262k** | T4 kvf16 | — | — | — | — | **35.77 breach** |
+| **230k / 262k** | T4 kvq8 ub1024 | 901.65 | 255.4 | 6.20 | `1cda86a2` | 37.97 |
+| **230k** | T9 kmtp ub1024 | 922.76 | 249.6 | **12.94** | `e2875202` | 36.12 |
+
+T1 owns 4k/64k prefill. T9 owns 64k/230k decode (QSA). T4 q8_0 is the only config that loads 262k under the 36 GiB floor.
+
+
 ## Raw evidence
 
 - `raw/ctx1024-nocache-v1.jsonl`: honest short-prompt baseline
@@ -392,6 +503,7 @@ The comparison repository is MIT licensed, Copyright (c) 2026 0xBakeer. Its meth
 - `raw/ple-mt/`: multithreaded PLE `set_input` index computation verification — short hash check (`cb7904d8`), cold 4k TTFT scaling (11.68 s at ub512, 10.78 s at ub1024), and cold 64k benchmark
 - `patches/ple-multithreaded-set-input.patch`: patch parallelizing PLE n-gram index computation in `llm_graph_input_ple::set_input` across worker threads
 - `raw/ple-advice-random.jsonl`: unpatched RANDOM cold+steady timings
+- `raw/ple-residency/`: PLE residency Gate 0 + `-ub 1024` clean-tree revalidation + Step 3 reopen `--tensor-read-lazy off` A/B — true-cold request-window disk reads 4k ≈405–443 MB / 64k ≈1,085–2,152 MB with lazy on (Grok's disk-bound prefill reproduces on GB10); lazy-off reopen **no-win** (4k TTFT 22.674 s vs 10.791 s, request-window reads rose 25×/10× — unified-memory reclaim evicts the MAP_POPULATE'd pages; axis closed, keep `--tensor-read-lazy on`); Step 2 stopped at the pre-decided hash gate (`06124a4b` ≠ `99a15d5b` at `-ub 1024`), TTFT not compared, Step 2'/composition not run
 - `raw/ple-pagesort/`: page-sorted PLE row gathering verification — short hash check (`cb7904d8`), cold 4k TTFT scaling (12.04 s), and cold 64k benchmark
 - `raw/ple-advice-ab.json`: isolated mmap-advice A/B decision record
 - `raw/ple-advice-prototype-random.jsonl`: patched RANDOM arm
@@ -399,6 +511,14 @@ The comparison repository is MIT licensed, Copyright (c) 2026 0xBakeer. Its meth
 - `raw/ple-advice-prototype-normal.jsonl`: patched NORMAL arm
 - `raw/ple-advice-prototype-sequential.jsonl`: patched SEQUENTIAL arm
 - `patches/ple-lazy-advice.patch`: rejected env-selector prototype
+- `raw/nsys-4k/`: nsys cold 4k prefill decision experiment — session kernel/memops reports, request benchmark, guard log, and window analysis (GPU 38.5% busy, ~6.6 s CPU-side gaps, graphs-reuse breakage identified); neither fused-gated-residual nor zero-copy-PLE indicated
+- `raw/graph-reuse/`: QSA graph-reuse fix verification — can_reuse overrides, GDB crash backtrace of the dangling-mctx bug, final gate logs (short hash match, repeat-request survival, 127 reuses/128-tok decode, ~12% decode speedup), no-override 4k control hash
+- `patches/qwen4exp-can-reuse.patch`: can_reuse overrides for llm_graph_input_qsa/llm_graph_input_ple with per-batch mctx refresh (also carries the restored PLE-MT content)
+- `raw/rmsnorm-fusion/`: fused zero-centered RMSNorm investigation — axis closed as not indicated: (1+w) already converter-folded, GEMM alpha structurally scalar, existing {RMS_NORM,MUL} fuser covers legal sites, qwen4exp sites fail fusion gates structurally, prize ~0.5-1% decode
+- `raw/deep-prefill-levers/`: deep-context prefill sizing + prefill graph-rebuild direct measurement — prefill-stable QSA graph CLOSED (build+alloc is 3.6-5.3 ms/ubatch, ~0.3-0.4% of prompt eval; nsys gaps are the host PLE gather path, not rebuild); decode graph-reuse win at 64k (71.88 vs 73.27 ms/tok, ~1.9%); ATS microbench named as deep-lane gate (failed, see ats-microbench)
+- `raw/ats-microbench/`: zero-copy host PLE first gate — ATS sustained 8.11 GB/s (1 GiB) / 6.36 GB/s (8 GiB cache-defeated) at 90-byte random granularity, failing the ≥20 GB/s plan gate; reframe: PLE demand ~1.4 MB/s/ubatch is 4,500x under the measured floor, so deep prefill is not interconnect-bound (sources + analysis)
+- `raw/ten-tests/`: 2026-08-30/31 ten-test campaign (T1–T10) — jsonl, server logs (`git add -f`), vmstat snapshots, per-patch ANALYSIS, campaign rollup
+- `patches/tt10-t1.patch` / `tt10-t2.patch` / `tt10-t7.patch` / `tt10-t10.patch`: T1 GET_ROWS fan-out (measured win), T2 prefetch (rejected), T7 row cache (rejected, path absent), T10 PLE_MT env (no-win)
 Raw JSONL in this directory is the unpatched recipe evidence. Kernel-track
 timings are the sibling config
 [`../../qwen38-flash-next-ud-iq4-xs-qsa/results/qsa-kernels.md`](../../qwen38-flash-next-ud-iq4-xs-qsa/results/qsa-kernels.md).

@@ -178,6 +178,33 @@ python3 tools/concurrent_benchmark.py \
 Task-shape experiments use `--variation-placeholder @` so repeated requests
 cannot train a speculative cache on an identical output.
 
+## Context length (ten-tests 2026-08-30/31)
+
+True-cold unless noted. Evidence: [`results/raw/ten-tests/`](results/raw/ten-tests/).
+
+| Ctx | Config | TTFT (s) | Prefill tok/s | Decode tok/s | Hash | Guard min GiB |
+|---|---|---:|---:|---:|---|---:|
+| ~76 (warm) | Gate 0 ub512 | 0.149 | — | 28.6 | `cb7904d8` | — |
+| ~76 (warm) | T1 GET_ROWS | 0.144 | — | 26.66 | `cb7904d8` | — |
+| ~76 (warm) | T5 kmtp+MTP | 0.322 | — | 26.54 | — | — |
+| **4k** | Gate 0 ub512 | 10.791 | 372.5 | 24.6 | `99a15d5b` | — |
+| **4k** | T1 GET_ROWS ub512 | **6.806** | **599.9** | 23.42 | `99a15d5b` | 50.86 |
+| **4k** | T3 ub1024 | **9.199** | 438.9 | 23.79 | `06124a4b` | — |
+| **4k** | T9 kmtp ub512 | 12.011 | 335.0 | 24.95 | `c64973d8` | 50.86 |
+| **64k** | Gate 0 ub512 | 170.663 | 384.7 | 14.5 | `b641e2eb` | — |
+| **64k** | T1 GET_ROWS ub512 | **131.94** | **498.1** | 13.96 | `b641e2eb` | — |
+| **64k** | T3 ub1024 | **160.99** | 408.4 | 14.35 | `a81283e2` | — |
+| **64k** | T9 kmtp ub512 | 166.57 | 393.9 | **20.44** | `b0ea9f23` | 47.71 |
+| **128k** | era f16 ub1024 | 386.77 | 339.5 | — | — | — |
+| **128k** | T4 kvq8 ub1024 | 397.5 | 330.4 | 9.78 | `9b622db0` | 44.2 |
+| **230k / 262k** | T4 kvf16 | — | — | — | — | **35.77 breach** |
+| **230k / 262k** | T4 kvq8 ub1024 | 901.65 | 255.4 | 6.20 | `1cda86a2` | 37.97 |
+| **230k** | T9 kmtp ub1024 | 922.76 | 249.6 | **12.94** | `e2875202` | 36.12 |
+
+T1 owns 4k/64k prefill. T9 owns 64k/230k decode (QSA). T4 `q8_0` KV is the only
+config that loads 262k under the 36 GiB floor. Recipe default remains F16 KV at
+4k; use `-ctk q8_0 -ctv q8_0` only for 262k.
+
 ## Rejected experiments and host safety
 
 - A port of the comparison repository's Qwen4Exp graph-reuse patch reached
@@ -190,8 +217,9 @@ cannot train a speculative cache on an identical output.
 - Switching PLE lazy-range advice from `POSIX_MADV_RANDOM` to `NORMAL` or
   `SEQUENTIAL` preserved output hashes but grew table residency (0.63 GiB and
   0.14 GiB vs 0.01 GiB) and worsened cold TTFT. Keep `RANDOM`.
-- Quantized KV is excluded from this candidate because current Qwen4Exp support
-  has had quantized-KV correctness failures.
+- Quantized KV is **not** the 4k default (F16). T4 showed `-ctk q8_0 -ctv q8_0`
+  **enables 262k** under the 36 GiB floor (f16 breaches at 35.77 GiB during
+  load; q8_0 holds 37.97 GiB). 128k q8_0 is not a TTFT win (397.5 vs 386.77 s).
 
 After a reboot or NVIDIA OOM, do not immediately relaunch. Confirm host uptime,
 GPU process state, `nvidia-smi`, disk headroom, and `MemAvailable` first.
